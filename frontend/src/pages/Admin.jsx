@@ -28,24 +28,64 @@ const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+
+  // Check login status on mount with server verification
+  useEffect(() => {
+    const verifyExistingLogin = async () => {
+      const savedPassword = localStorage.getItem("adminPassword");
+      if (savedPassword) {
+        try {
+          await api.post(
+            "/verify-admin",
+            {},
+            {
+              headers: { "x-admin-password": savedPassword },
+            }
+          );
+          setIsAuthenticated(true);
+        } catch (error) {
+          // If server rejects password, clear it
+          localStorage.removeItem("adminPassword");
+          setIsAuthenticated(false);
+        }
+      }
+      setVerifying(false);
+    };
+
+    verifyExistingLogin();
+  }, []);
 
   const handleLogin = async () => {
+    if (!password) return;
     setLoading(true);
-    // Store password and verify
-    localStorage.setItem("adminPassword", password);
-    setTimeout(() => {
+
+    try {
+      // 1. Verify password with backend BEFORE logging in
+      await api.post(
+        "/verify-admin",
+        {},
+        {
+          headers: { "x-admin-password": password },
+        }
+      );
+
+      // 2. Only if verification succeeds:
+      localStorage.setItem("adminPassword", password);
       setIsAuthenticated(true);
-      toast.success("Welcome to Admin Dashboard!");
+      toast.success("Welcome back, Admin!");
+    } catch (error) {
+      // 3. If verification fails:
+      console.error(error);
+      toast.error("Invalid Password! Access Denied.");
+      setPassword(""); // Clear input
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
-  useEffect(() => {
-    const savedPassword = localStorage.getItem("adminPassword");
-    if (savedPassword) {
-      setIsAuthenticated(true);
-    }
-  }, []);
+  // Avoid flickering login screen while checking local storage
+  if (verifying) return null;
 
   if (!isAuthenticated)
     return (

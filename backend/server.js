@@ -135,6 +135,11 @@ app.get("/api/content", async (req, res) => {
 
 // --- ADMIN ROUTES ---
 
+// NEW: Verification Route for Secure Login
+app.post("/api/verify-admin", verifyAdmin, (req, res) => {
+  res.status(200).json({ success: true, message: "Admin verified" });
+});
+
 const upload = multer();
 app.post("/api/upload", verifyAdmin, upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).send("No file uploaded.");
