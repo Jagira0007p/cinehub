@@ -49,17 +49,13 @@ app.get("/api/home", async (req, res) => {
   }
 });
 
-// 2. NEW: Get Available Filters (Unique Genres & Years)
+// 2. Get Available Filters
 app.get("/api/filters/:type", async (req, res) => {
   try {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
-
-    // Get unique values from DB
     const genres = await Model.distinct("genre");
     const years = await Model.distinct("year");
-
-    // Clean and sort data
     res.json({
       genres: genres.filter(Boolean).sort(),
       years: years.filter(Boolean).sort((a, b) => b - a),
@@ -69,33 +65,22 @@ app.get("/api/filters/:type", async (req, res) => {
   }
 });
 
-// 3. UPDATED: Get List with Search & Pagination
+// 3. Get List with Search & Pagination
 app.get("/api/list/:type", async (req, res) => {
   try {
     const { type } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = 20;
     const skip = (page - 1) * limit;
-
-    // Extract filters from URL query
     const { search, genre, year } = req.query;
 
-    // Build the Database Query
     const query = {};
-    if (search) {
-      // Regular Expression for partial match (case-insensitive)
-      query.title = { $regex: search, $options: "i" };
-    }
-    if (genre) {
-      query.genre = genre;
-    }
-    if (year) {
-      query.year = year;
-    }
+    if (search) query.title = { $regex: search, $options: "i" };
+    if (genre) query.genre = genre;
+    if (year) query.year = year;
 
     const Model = type === "movie" ? Movie : Series;
 
-    // Fetch Items and Total Count (for pagination)
     const [items, total] = await Promise.all([
       Model.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Model.countDocuments(query),
@@ -122,7 +107,6 @@ app.get("/api/content/:type/:id", async (req, res) => {
   }
 });
 
-// Used for Admin List (Internal)
 app.get("/api/content", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 });
@@ -135,7 +119,41 @@ app.get("/api/content", async (req, res) => {
 
 // --- ADMIN ROUTES ---
 
-// NEW: Verification Route for Secure Login
+// NEW: Real Stats Route
+app.get("/api/stats", async (req, res) => {
+  try {
+    const movieCount = await Movie.countDocuments();
+    const seriesCount = await Series.countDocuments();
+
+    // Count total episodes
+    const allSeries = await Series.find({}, "episodes");
+    const episodeCount = allSeries.reduce(
+      (acc, curr) => acc + (curr.episodes ? curr.episodes.length : 0),
+      0
+    );
+
+    // Get 5 most recent items for dashboard list
+    const recentMovies = await Movie.find().sort({ createdAt: -1 }).limit(5);
+    const recentSeries = await Series.find().sort({ createdAt: -1 }).limit(5);
+
+    // Combine and sort by date
+    const recent = [...recentMovies, ...recentSeries]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5);
+
+    res.json({
+      movies: movieCount,
+      series: seriesCount,
+      episodes: episodeCount,
+      total: movieCount + seriesCount,
+      recent,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verification Route
 app.post("/api/verify-admin", verifyAdmin, (req, res) => {
   res.status(200).json({ success: true, message: "Admin verified" });
 });
@@ -203,31 +221,6 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-app.put(
-  "/api/content/series/:seriesId/episode/:episodeId",
-  verifyAdmin,
-  async (req, res) => {
-    try {
-      const { seriesId, episodeId } = req.params;
-      const { title, episodeNumber, downloads } = req.body;
-      const series = await Series.findById(seriesId);
-      if (!series) return res.status(404).json({ error: "Series not found" });
-
-      const episode = series.episodes.id(episodeId);
-      if (!episode) return res.status(404).json({ error: "Episode not found" });
-
-      episode.title = title;
-      episode.episodeNumber = episodeNumber;
-      episode.downloads = downloads;
-
-      await series.save();
-      res.json(series);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  }
-);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

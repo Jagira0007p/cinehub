@@ -17,7 +17,7 @@ const Footer = () => {
             <div className="flex items-center gap-2">
               <Film className="w-8 h-8 text-red-500" />
               <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-400">
-                CinemaHub
+                DVStream
               </span>
             </div>
             <p className="text-gray-400 text-sm">
@@ -106,7 +106,7 @@ const Footer = () => {
           className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-500 text-sm"
         >
           <p>
-            © {currentYear} CinemaHub. All content is for demonstration purposes
+            © {currentYear} DVStream. All content is for demonstration purposes
             only.
           </p>
           <div className="flex items-center justify-center gap-2 mt-2">
