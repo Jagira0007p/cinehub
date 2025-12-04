@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Film,
   Tv,
   Home,
   Lock,
@@ -9,7 +8,7 @@ import {
   Sparkles,
   Search,
   ArrowLeft,
-} from "lucide-react";
+} from "lucide-react"; // Removed 'Film' since we use an image now
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,7 +19,6 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // NEW: State for mobile search toggle
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const mobileInputRef = useRef(null);
 
@@ -32,7 +30,6 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Auto-focus input when mobile search opens
   useEffect(() => {
     if (showMobileSearch && mobileInputRef.current) {
       mobileInputRef.current.focus();
@@ -42,9 +39,9 @@ const Navbar = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      navigate(`/search?query=${encodeURIComponent(searchTerm.trim())}`);
+      navigate(`/search?q=${encodeURIComponent(searchTerm)}`);
       setIsOpen(false);
-      setShowMobileSearch(false); // Close mobile search after submitting
+      setShowMobileSearch(false);
       setSearchTerm("");
     }
   };
@@ -53,7 +50,7 @@ const Navbar = () => {
 
   const navItems = [
     { path: "/", label: "Home", icon: Home },
-    { path: "/movies", label: "Movies", icon: Film },
+    { path: "/movies", label: "Movies", icon: Tv }, // Changed icon to Tv generic or keep Film if you prefer for menu items
     { path: "/series", label: "Series", icon: Tv },
     { path: "/admin", label: "Admin", icon: Lock },
   ];
@@ -108,7 +105,7 @@ const Navbar = () => {
                   exit={{ opacity: 0 }}
                   key="standard-navbar"
                 >
-                  {/* Logo */}
+                  {/* Logo Section */}
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -116,8 +113,14 @@ const Navbar = () => {
                   >
                     <Link to="/" className="flex items-center gap-2">
                       <div className="relative">
-                        <Film className="w-8 h-8 text-red-500 animate-pulse" />
-                        <Sparkles className="w-3 h-3 text-yellow-400 absolute -top-1 -right-1 animate-spin" />
+                        {/* CUSTOM LOGO IMAGE WITH PULSE EFFECT */}
+                        <img
+                          src="/favicon.png"
+                          alt="DVStream Logo"
+                          className="w-10 h-10 object-contain animate-pulse drop-shadow-lg"
+                        />
+                        {/* ANIMATED SPARKLE/RING EFFECT */}
+                        <Sparkles className="w-4 h-4 text-yellow-400 absolute -top-1 -right-1 animate-spin" />
                       </div>
                       <motion.span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-500 via-orange-400 to-red-500 bg-[length:200%] animate-gradient">
                         DVStream
@@ -125,7 +128,7 @@ const Navbar = () => {
                     </Link>
                   </motion.div>
 
-                  {/* Desktop Navigation & Search (Hidden on Mobile) */}
+                  {/* Desktop Navigation & Search */}
                   <div className="hidden md:flex items-center gap-6">
                     <form onSubmit={handleSearch} className="relative group">
                       <input
@@ -168,13 +171,12 @@ const Navbar = () => {
                     ))}
                   </div>
 
-                  {/* Mobile Icons (Search & Menu) */}
+                  {/* Mobile Icons */}
                   <div className="flex items-center gap-2 md:hidden">
-                    {/* NEW: Mobile Search Trigger */}
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       onClick={() => {
-                        setIsOpen(false); // Close menu if open
+                        setIsOpen(false);
                         setShowMobileSearch(true);
                       }}
                       className="p-2 rounded-lg bg-gray-800/50 text-gray-200"
@@ -182,7 +184,6 @@ const Navbar = () => {
                       <Search size={24} />
                     </motion.button>
 
-                    {/* Menu Trigger */}
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       onClick={() => setIsOpen(!isOpen)}
@@ -198,7 +199,7 @@ const Navbar = () => {
         </div>
       </motion.nav>
 
-      {/* Mobile Dropdown Menu (Only visible when NOT searching) */}
+      {/* Mobile Dropdown Menu */}
       <AnimatePresence>
         {isOpen && !showMobileSearch && (
           <motion.div
