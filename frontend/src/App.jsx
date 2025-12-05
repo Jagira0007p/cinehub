@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Detail from "./pages/Detail";
 import Admin from "./pages/Admin";
 import ListingPage from "./pages/ListingPage";
+import SearchPage from "./pages/SearchPage";
 import Footer from "./components/Footer";
 import ScrollToTop from "./components/ScrollToTop";
 import { ToastContainer } from "react-toastify";
@@ -36,6 +37,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/movies" element={<ListingPage type="movie" />} />
               <Route path="/series" element={<ListingPage type="series" />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route path="/:type/:id" element={<Detail />} />
               <Route path="/admin" element={<Admin />} />
             </Routes>
