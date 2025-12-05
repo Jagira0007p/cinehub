@@ -11,7 +11,9 @@ import {
   Shield,
   Search,
   Loader2,
-  Save,
+  PlayCircle,
+  Clock,
+  CheckCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
@@ -31,7 +33,9 @@ const Admin = () => {
           await api.post(
             "/verify-admin",
             {},
-            { headers: { "x-admin-password": savedPassword } }
+            {
+              headers: { "x-admin-password": savedPassword },
+            }
           );
           setIsAuthenticated(true);
         } catch (error) {
@@ -51,7 +55,9 @@ const Admin = () => {
       await api.post(
         "/verify-admin",
         {},
-        { headers: { "x-admin-password": password } }
+        {
+          headers: { "x-admin-password": password },
+        }
       );
       localStorage.setItem("adminPassword", password);
       setIsAuthenticated(true);
@@ -65,6 +71,7 @@ const Admin = () => {
   };
 
   if (verifying) return null;
+
   if (!isAuthenticated)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4">
@@ -120,6 +127,7 @@ const Admin = () => {
             <Shield className="w-4 h-4" /> Logout
           </button>
         </div>
+
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: "content", label: "Manage Movies/Series", icon: Film },
@@ -138,6 +146,7 @@ const Admin = () => {
             </button>
           ))}
         </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -153,7 +162,7 @@ const Admin = () => {
   );
 };
 
-// --- CONTENT MANAGER ---
+// --- CONTENT MANAGER (UPDATED) ---
 const ContentManager = () => {
   const [items, setItems] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -188,14 +197,12 @@ const ContentManager = () => {
 
   const handleEdit = (item) => {
     setEditingId(item._id);
-    // FIX: Convert Genre Array back to String for editing
     const genreString = Array.isArray(item.genre)
       ? item.genre.join(", ")
       : item.genre;
-
     setFormData({
       ...item,
-      genre: genreString, // Display as "Action, Sci-Fi"
+      genre: genreString,
       downloads: item.downloads || initialForm.downloads,
       batchLinks: item.batchLinks || initialForm.batchLinks,
       previewImages: item.previewImages || [],
@@ -215,6 +222,32 @@ const ContentManager = () => {
     }
   };
 
+  // --- NEW: DELETE IMAGE FUNCTION ---
+  const deleteImage = async (url, type, index = null) => {
+    if (!confirm("Are you sure you want to delete this image?")) return;
+
+    try {
+      // 1. Delete from Cloudinary
+      await api.delete("/upload", {
+        data: { url },
+        ...getAdminHeaders(),
+      });
+
+      // 2. Update Form State
+      if (type === "poster") {
+        setFormData({ ...formData, poster: "" });
+      } else {
+        const newPreviews = formData.previewImages.filter(
+          (_, i) => i !== index
+        );
+        setFormData({ ...formData, previewImages: newPreviews });
+      }
+      toast.success("Image deleted");
+    } catch (error) {
+      toast.error("Failed to delete image");
+    }
+  };
+
   const uploadImage = async (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -223,12 +256,21 @@ const ContentManager = () => {
     data.append("file", file);
     try {
       const res = await api.post("/upload", data, getAdminHeaders());
-      if (type === "poster") setFormData({ ...formData, poster: res.data.url });
-      else
+      if (type === "poster") {
+        // If a poster already exists, delete it first to keep Cloudinary clean
+        if (formData.poster) {
+          await api.delete("/upload", {
+            data: { url: formData.poster },
+            ...getAdminHeaders(),
+          });
+        }
+        setFormData({ ...formData, poster: res.data.url });
+      } else {
         setFormData({
           ...formData,
           previewImages: [...formData.previewImages, res.data.url],
         });
+      }
       toast.success("Uploaded!");
     } catch (error) {
       toast.error("Upload failed");
@@ -334,30 +376,56 @@ const ContentManager = () => {
               />
             </div>
 
-            {/* Images */}
-            <div className="border-t border-gray-700 pt-4 space-y-2">
+            {/* Images Section Updated */}
+            <div className="border-t border-gray-700 pt-4 space-y-4">
               <div>
                 <p className="text-xs font-bold mb-1">Poster</p>
-                <input
-                  type="file"
-                  onChange={(e) => uploadImage(e, "poster")}
-                  className="text-xs"
-                />
-                {formData.poster && (
-                  <img src={formData.poster} className="h-12 mt-2 rounded" />
+                {!formData.poster ? (
+                  <input
+                    type="file"
+                    onChange={(e) => uploadImage(e, "poster")}
+                    className="text-xs text-gray-400"
+                  />
+                ) : (
+                  <div className="relative inline-block group">
+                    <img
+                      src={formData.poster}
+                      className="h-20 rounded shadow-md"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deleteImage(formData.poster, "poster")}
+                      className="absolute -top-2 -right-2 bg-red-600 p-1 rounded-full text-white shadow-lg hover:bg-red-700"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 )}
               </div>
+
               <div>
                 <p className="text-xs font-bold mb-1">Screenshots (Max 4)</p>
                 <input
                   type="file"
                   onChange={(e) => uploadImage(e, "preview")}
-                  className="text-xs"
+                  className="text-xs text-gray-400 mb-2"
                   disabled={formData.previewImages.length >= 4}
                 />
-                <div className="flex gap-2 mt-2">
+                <div className="grid grid-cols-4 gap-2">
                   {formData.previewImages.map((src, i) => (
-                    <img key={i} src={src} className="h-10 rounded" />
+                    <div key={i} className="relative group">
+                      <img
+                        src={src}
+                        className="h-12 w-full object-cover rounded border border-gray-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => deleteImage(src, "preview", i)}
+                        className="absolute -top-1 -right-1 bg-red-600 p-0.5 rounded-full text-white shadow-md hover:bg-red-700"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -465,7 +533,7 @@ const ContentManager = () => {
               disabled={uploading}
               className="w-full bg-green-600 py-3 rounded-xl font-bold"
             >
-              {uploading ? "Uploading..." : "Save Content"}
+              {uploading ? "Processing..." : "Save Content"}
             </button>
           </form>
         </div>

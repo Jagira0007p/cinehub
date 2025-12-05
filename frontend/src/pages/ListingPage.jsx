@@ -106,7 +106,7 @@ const ListingPage = ({ type }) => {
       className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-2xl mb-6 border border-gray-700/50"
     >
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Search Input */}
+        {/* Search Input
         <div className="relative">
           <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
             <Search className="w-5 h-5 text-gray-400" />
@@ -126,7 +126,7 @@ const ListingPage = ({ type }) => {
               <X className="w-4 h-4" />
             </button>
           )}
-        </div>
+        </div> */}
 
         {/* Genre Dropdown */}
         <select

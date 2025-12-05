@@ -264,6 +264,23 @@ app.delete(
     }
   }
 );
+app.delete("/api/upload", verifyAdmin, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "No URL provided" });
+
+    // Extract public_id from URL (e.g., .../movie-site/abc.jpg -> movie-site/abc)
+    const parts = url.split("/");
+    const filename = parts.pop().split(".")[0];
+    const folder = parts.pop();
+    const publicId = `${folder}/${filename}`;
+
+    await cloudinary.uploader.destroy(publicId);
+    res.json({ message: "Image deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Sitemap route (Keep unchanged)
 app.get("/sitemap.xml", async (req, res) => {

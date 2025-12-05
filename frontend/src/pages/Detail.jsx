@@ -12,6 +12,7 @@ import {
   FolderDown,
   ExternalLink,
   Layers,
+  Image as ImageIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -27,10 +28,8 @@ const Detail = () => {
   const [batchQuality, setBatchQuality] = useState("720p");
   const [copied, setCopied] = useState(false);
 
-  const { ref: screenshotRef, inView: screenshotInView } = useInView({
-    triggerOnce: true,
-    threshold: 0.1,
-  });
+  // Screenshot Viewer Modal
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     api.get(`/content/${type}/${id}`).then((res) => setItem(res.data));
@@ -70,7 +69,6 @@ const Detail = () => {
   // Helper to safely get the batch link
   const getBatchLink = () => {
     if (!item?.batchLinks) return null;
-    // Handle both "p720" and "720p" formats just in case
     const key = `p${batchQuality.replace("p", "")}`;
     return item.batchLinks[key];
   };
@@ -117,7 +115,11 @@ const Detail = () => {
               {item.title}
             </h1>
             <div className="flex flex-wrap gap-3 mb-6">
-              {[item.year, item.genre, type].map((tag, idx) => (
+              {[
+                item.year,
+                ...(Array.isArray(item.genre) ? item.genre : [item.genre]),
+                type,
+              ].map((tag, idx) => (
                 <span
                   key={idx}
                   className="px-4 py-2 bg-gray-900/70 backdrop-blur-sm rounded-full text-sm"
@@ -163,6 +165,31 @@ const Detail = () => {
             </p>
           </div>
 
+          {/* --- NEW: PREVIEW IMAGES (SCREENSHOTS) --- */}
+          {item.previewImages && item.previewImages.length > 0 && (
+            <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <ImageIcon className="text-blue-500" /> Screenshots
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {item.previewImages.map((img, index) => (
+                  <motion.div
+                    key={index}
+                    whileHover={{ scale: 1.02 }}
+                    className="rounded-xl overflow-hidden shadow-lg cursor-pointer border border-gray-700"
+                    onClick={() => setPreviewImage(img)}
+                  >
+                    <img
+                      src={img}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-48 object-cover hover:opacity-90 transition"
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* MOVIE DOWNLOADS */}
           {type === "movie" && item.downloads && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
@@ -202,7 +229,6 @@ const Detail = () => {
                   <Layers className="text-red-500" /> Episodes (
                   {item.episodes.length})
                 </h3>
-                {/* Batch Button */}
                 <button
                   onClick={() => setShowBatchModal(true)}
                   className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-red-600 to-orange-500 rounded-full font-bold shadow-lg hover:shadow-red-500/20 transition"
@@ -257,10 +283,6 @@ const Detail = () => {
                 <span>{item.year}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Genre</span>
-                <span>{item.genre}</span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Format</span>
                 <span>MKV / MP4</span>
               </div>
@@ -269,7 +291,32 @@ const Detail = () => {
         </div>
       </div>
 
-      {/* --- EPISODE POPUP (SINGLE EPISODE) --- */}
+      {/* --- PREVIEW IMAGE MODAL (Lightroom Style) --- */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 text-white hover:text-red-500 transition"
+            >
+              <X size={32} />
+            </button>
+            <img
+              src={previewImage}
+              alt="Full Preview"
+              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- EPISODE POPUP --- */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -375,9 +422,7 @@ const Detail = () => {
                 </div>
               </div>
 
-              {/* LOGIC: DIRECT LINK vs COPY LIST */}
               {getBatchLink() ? (
-                /* SCENARIO 1: Batch Link Exists in Admin -> Show Direct Button */
                 <div className="text-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
                   <div className="mb-4">
                     <p className="text-green-400 font-medium mb-1">
@@ -397,32 +442,18 @@ const Detail = () => {
                   </a>
                 </div>
               ) : (
-                /* SCENARIO 2: No Batch Link -> Show Copy List */
                 <>
-                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-xs text-orange-400 font-bold">
-                        ⚠️ No Batch Folder Found
-                      </p>
-                      <p className="text-[10px] text-gray-500">
-                        Showing individual episode links
-                      </p>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                      <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
-                        {item.episodes
-                          .sort((a, b) => a.episodeNumber - b.episodeNumber)
-                          .map(
-                            (ep) =>
-                              ep.downloads?.[
-                                `p${batchQuality.replace("p", "")}`
-                              ]
-                          )
-                          .filter((l) => l)
-                          .join("\n") ||
-                          "No individual links found for this quality."}
-                      </pre>
-                    </div>
+                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
+                      {item.episodes
+                        .sort((a, b) => a.episodeNumber - b.episodeNumber)
+                        .map(
+                          (ep) =>
+                            ep.downloads?.[`p${batchQuality.replace("p", "")}`]
+                        )
+                        .filter((l) => l)
+                        .join("\n") || "No individual links found."}
+                    </pre>
                   </div>
                   <button
                     onClick={copyBatchLinks}
