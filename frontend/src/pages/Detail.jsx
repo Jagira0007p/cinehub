@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import api from "../api";
 import {
   Download,
@@ -10,15 +10,23 @@ import {
   Users,
   Share2,
   Bookmark,
+  X,
+  Copy,
+  CheckCircle,
+  Layers,
+  FolderDown,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 
 const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
-  const [selectedQuality, setSelectedQuality] = useState("1080p");
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [selectedEpisode, setSelectedEpisode] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchQuality, setBatchQuality] = useState("720p");
+  const [copied, setCopied] = useState(false);
 
   const { ref: screenshotRef, inView: screenshotInView } = useInView({
     triggerOnce: true,
@@ -27,7 +35,6 @@ const Detail = () => {
 
   useEffect(() => {
     api.get(`/content/${type}/${id}`).then((res) => setItem(res.data));
-    // Check if bookmarked
     const bookmarks = JSON.parse(localStorage.getItem("bookmarks") || "[]");
     setIsBookmarked(bookmarks.includes(id));
   }, [type, id]);
@@ -49,64 +56,36 @@ const Detail = () => {
       try {
         await navigator.share({
           title: item?.title,
-          text: `Check out ${item?.title} on CinemaHub`,
+          text: `Check out ${item?.title}`,
           url: window.location.href,
         });
       } catch (err) {
-        console.log("Error sharing:", err);
+        console.log(err);
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert("Link copied to clipboard!");
+      alert("Link copied!");
     }
   };
 
-  if (!item)
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-xl text-gray-400">Loading content...</p>
-        </div>
-      </div>
-    );
+  const getBatchLink = () => {
+    return item?.batchLinks?.[`p${batchQuality.replace("p", "")}`];
+  };
 
-  const DownloadBtn = ({ label, link, quality }) => (
-    <motion.a
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={() => setSelectedQuality(quality)}
-      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-        selectedQuality === quality
-          ? "border-red-500 bg-red-500/10"
-          : "border-gray-700 hover:border-red-500 hover:bg-red-500/5"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`p-2 rounded-lg ${
-            quality === "480p"
-              ? "bg-blue-500/20 text-blue-400"
-              : quality === "720p"
-              ? "bg-green-500/20 text-green-400"
-              : "bg-purple-500/20 text-purple-400"
-          }`}
-        >
-          <Download size={20} />
-        </div>
-        <div>
-          <p className="font-bold">{quality}</p>
-          <p className="text-sm text-gray-400">HD Quality</p>
-        </div>
-      </div>
-      <div className="px-3 py-1 bg-gray-800 rounded-full text-xs">
-        {quality === "480p" ? "Fast" : quality === "720p" ? "HD" : "Best"}
-      </div>
-    </motion.a>
-  );
+  const copyBatchLinks = () => {
+    if (!item?.episodes) return;
+    const links = item.episodes
+      .sort((a, b) => a.episodeNumber - b.episodeNumber)
+      .map((ep) => ep.downloads?.[`p${batchQuality.replace("p", "")}`])
+      .filter((link) => link)
+      .join("\n");
+    navigator.clipboard.writeText(links);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!item)
+    return <div className="text-center py-20 text-gray-400">Loading...</div>;
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
@@ -126,279 +105,294 @@ const Detail = () => {
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
-
         <div className="relative z-20 container mx-auto px-4 h-full flex items-end pb-12">
           <div className="max-w-3xl">
-            <motion.h1
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="text-4xl md:text-6xl font-bold mb-4 leading-tight"
-            >
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight">
               {item.title}
-            </motion.h1>
+            </h1>
             <div className="flex flex-wrap gap-3 mb-6">
               {[item.year, item.genre, type].map((tag, idx) => (
-                <motion.span
+                <span
                   key={idx}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: idx * 0.1 }}
                   className="px-4 py-2 bg-gray-900/70 backdrop-blur-sm rounded-full text-sm"
                 >
                   {tag}
-                </motion.span>
+                </span>
               ))}
             </div>
             <div className="flex gap-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 py-3 bg-gradient-to-r from-red-600 to-orange-500 rounded-full font-bold shadow-xl shadow-red-500/30 hover:shadow-red-500/50 transition flex items-center gap-2"
-              >
-                <PlayCircle size={20} />
-                Watch Now
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={handleBookmark}
                 className={`p-3 rounded-full backdrop-blur-sm border ${
                   isBookmarked
                     ? "bg-red-500/20 border-red-500 text-red-400"
-                    : "bg-gray-900/50 border-gray-700 hover:border-red-500"
+                    : "bg-gray-900/50 border-gray-700"
                 }`}
               >
                 <Bookmark
                   size={20}
                   fill={isBookmarked ? "currentColor" : "none"}
                 />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              </button>
+              <button
                 onClick={shareContent}
-                className="p-3 rounded-full backdrop-blur-sm border border-gray-700 hover:border-blue-500 bg-gray-900/50"
+                className="p-3 rounded-full backdrop-blur-sm border border-gray-700 bg-gray-900/50"
               >
                 <Share2 size={20} />
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Description */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50"
-          >
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <div className="w-2 h-8 bg-red-500 rounded-full" />
+          <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
+            <h2 className="text-2xl font-bold mb-4 border-l-4 border-red-500 pl-3">
               Synopsis
             </h2>
             <p className="text-gray-300 leading-relaxed text-lg">
               {item.description}
             </p>
-          </motion.div>
+          </div>
 
-          {/* Movie Downloads */}
+          {/* MOVIE DOWNLOADS */}
           {type === "movie" && item.downloads && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <Download className="text-green-500" />
-                  Download Links
-                </h2>
-                <div className="text-sm text-gray-400">
-                  Select quality and click to download
-                </div>
-              </div>
+            <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
+              <h2 className="text-2xl font-bold mb-6">Download Links</h2>
               <div className="space-y-3">
-                {item.downloads.p1080 && (
-                  <DownloadBtn
-                    label="1080p"
-                    link={item.downloads.p1080}
-                    quality="1080p"
-                  />
-                )}
-                {item.downloads.p720 && (
-                  <DownloadBtn
-                    label="720p"
-                    link={item.downloads.p720}
-                    quality="720p"
-                  />
-                )}
-                {item.downloads.p480 && (
-                  <DownloadBtn
-                    label="480p"
-                    link={item.downloads.p480}
-                    quality="480p"
-                  />
+                {Object.entries(item.downloads).map(
+                  ([quality, link]) =>
+                    link && (
+                      <a
+                        key={quality}
+                        href={link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Download size={20} className="text-red-500" />
+                          <span className="font-bold uppercase">
+                            {quality.replace("p", "")}p
+                          </span>
+                        </div>
+                        <span className="text-xs bg-gray-800 px-3 py-1 rounded-full">
+                          Download
+                        </span>
+                      </a>
+                    )
                 )}
               </div>
-            </motion.div>
-          )}
-
-          {/* Screenshots */}
-          {item.previewImages && item.previewImages.length > 0 && (
-            <motion.div
-              ref={screenshotRef}
-              initial={{ opacity: 0 }}
-              animate={screenshotInView ? { opacity: 1 } : {}}
-              transition={{ delay: 0.3 }}
-              className="space-y-6"
-            >
-              <h2 className="text-2xl font-bold">Screenshots</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {item.previewImages.map((img, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={screenshotInView ? { opacity: 1, scale: 1 } : {}}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ scale: 1.05 }}
-                    className="relative overflow-hidden rounded-xl aspect-video cursor-pointer group"
-                  >
-                    <img
-                      src={img}
-                      alt={`Screenshot ${idx + 1}`}
-                      className="w-full h-full object-cover transform group-hover:scale-110 transition duration-500"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                      <div className="p-3 bg-red-600 rounded-full">
-                        <PlayCircle size={20} />
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Info Card */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50"
-          >
-            <h3 className="text-xl font-bold mb-4">Details</h3>
-            <div className="space-y-3">
-              {[
-                { icon: Calendar, label: "Year", value: item.year },
-                { icon: Star, label: "Genre", value: item.genre },
-                {
-                  icon: Clock,
-                  label: "Type",
-                  value: type.charAt(0).toUpperCase() + type.slice(1),
-                },
-                { icon: Users, label: "Quality", value: "1080p/720p/480p" },
-              ].map((detail, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between py-2 border-b border-gray-700/30"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gray-800 rounded-lg">
-                      <detail.icon size={16} className="text-gray-400" />
-                    </div>
-                    <span className="text-gray-400">{detail.label}</span>
-                  </div>
-                  <span className="font-medium">{detail.value}</span>
-                </div>
-              ))}
             </div>
-          </motion.div>
+          )}
 
-          {/* Series Episodes */}
+          {/* SERIES EPISODES */}
           {type === "series" && item.episodes && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">Episodes</h3>
-                <span className="text-sm text-gray-400">
-                  {item.episodes.length} total
-                </span>
+            <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <Layers className="text-red-500" /> Episodes (
+                  {item.episodes.length})
+                </h3>
+                <button
+                  onClick={() => setShowBatchModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-full text-sm border border-gray-600 transition"
+                >
+                  <FolderDown size={16} /> Batch / Season Pack
+                </button>
               </div>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+
+              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {item.episodes
                   ?.sort((a, b) => a.episodeNumber - b.episodeNumber)
                   .map((ep, idx) => (
                     <motion.div
                       key={ep._id}
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="group p-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition cursor-pointer"
+                      transition={{ delay: idx * 0.03 }}
+                      onClick={() => setSelectedEpisode(ep)}
+                      className="group p-4 rounded-xl bg-gray-800/50 hover:bg-gray-700 cursor-pointer border border-transparent hover:border-red-500/30 transition flex justify-between items-center"
                     >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-orange-500 rounded-lg flex items-center justify-center font-bold">
-                            {ep.episodeNumber}
-                          </div>
-                          <div>
-                            <p className="font-medium truncate">{ep.title}</p>
-                            <p className="text-xs text-gray-400">
-                              Episode {ep.episodeNumber}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center font-bold">
+                          {ep.episodeNumber}
                         </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition">
-                          <Download className="w-5 h-5 text-green-400" />
+                        <div>
+                          <p className="font-bold text-white group-hover:text-red-400 transition">
+                            {ep.title || `Episode ${ep.episodeNumber}`}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Click to download
+                          </p>
                         </div>
                       </div>
+                      <Download
+                        size={20}
+                        className="text-gray-500 group-hover:text-white"
+                      />
                     </motion.div>
                   ))}
               </div>
-            </motion.div>
-          )}
-
-          {/* Related Content */}
-          {/* <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50"
-          >
-            <h3 className="text-xl font-bold mb-4">You might also like</h3>
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Link
-                  key={i}
-                  to="#"
-                  className="flex gap-3 p-2 rounded-lg hover:bg-gray-700/30 transition"
-                >
-                  <img
-                    src={item.poster}
-                    className="w-12 h-16 rounded object-cover"
-                    alt="Related"
-                  />
-                  <div>
-                    <p className="font-medium">Related Title {i}</p>
-                    <p className="text-xs text-gray-400">2023 • Action</p>
-                  </div>
-                </Link>
-              ))}
             </div>
-          </motion.div> */}
+          )}
         </div>
+        <div className="space-y-6">{/* Sidebar Info can go here */}</div>
       </div>
+
+      {/* EPISODE POPUP */}
+      <AnimatePresence>
+        {selectedEpisode && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setSelectedEpisode(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-full max-w-md shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setSelectedEpisode(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              >
+                <X />
+              </button>
+              <h3 className="text-2xl font-bold mb-1">
+                Episode {selectedEpisode.episodeNumber}
+              </h3>
+              <p className="text-gray-400 mb-6">{selectedEpisode.title}</p>
+              <div className="space-y-3">
+                {Object.entries(selectedEpisode.downloads || {}).map(
+                  ([res, link]) =>
+                    link ? (
+                      <a
+                        key={res}
+                        href={link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group"
+                      >
+                        <span className="font-bold text-lg uppercase">
+                          {res.replace("p", "")}p
+                        </span>
+                        <div className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white">
+                          Download <Download size={16} />
+                        </div>
+                      </a>
+                    ) : null
+                )}
+                {!Object.values(selectedEpisode.downloads || {}).some(
+                  (x) => x
+                ) && (
+                  <p className="text-center text-gray-500">
+                    No links available.
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BATCH DOWNLOAD MODAL */}
+      <AnimatePresence>
+        {showBatchModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setShowBatchModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              className="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowBatchModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              >
+                <X />
+              </button>
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <FolderDown className="text-red-500" /> Batch Download
+              </h3>
+
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 mb-2">Select Quality:</p>
+                <div className="flex gap-2">
+                  {["480p", "720p", "1080p"].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => setBatchQuality(q)}
+                      className={`px-4 py-2 rounded-lg border text-sm font-bold transition ${
+                        batchQuality === q
+                          ? "bg-red-600 border-red-600 text-white"
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* LOGIC: IF BATCH LINK EXISTS, SHOW BUTTON. ELSE SHOW COPY LIST */}
+              {getBatchLink() ? (
+                <div className="text-center py-6">
+                  <a
+                    href={getBatchLink()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 mb-2"
+                  >
+                    <Download size={20} /> Download Complete Season (
+                    {batchQuality})
+                  </a>
+                  <p className="text-xs text-gray-500">
+                    Direct Zip/Folder Link
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
+                      {item.episodes
+                        .sort((a, b) => a.episodeNumber - b.episodeNumber)
+                        .map(
+                          (ep) =>
+                            ep.downloads?.[`p${batchQuality.replace("p", "")}`]
+                        )
+                        .filter((l) => l)
+                        .join("\n") || "No individual links found."}
+                    </pre>
+                  </div>
+                  <button
+                    onClick={copyBatchLinks}
+                    className="w-full py-3 bg-gray-800 border border-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition flex items-center justify-center gap-2"
+                  >
+                    {copied ? (
+                      <CheckCircle className="text-green-600" />
+                    ) : (
+                      <Copy size={18} />
+                    )}{" "}
+                    {copied ? "Copied!" : "Copy Individual Links"}
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

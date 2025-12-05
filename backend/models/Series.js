@@ -18,7 +18,13 @@ const seriesSchema = new mongoose.Schema(
     year: Number,
     poster: String,
     previewImages: [String],
-    episodes: [episodeSchema], // Embedded episodes
+    // NEW: Add Batch Links Field
+    batchLinks: {
+      p480: String,
+      p720: String,
+      p1080: String,
+    },
+    episodes: [episodeSchema],
   },
   { timestamps: true }
 );

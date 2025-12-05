@@ -222,5 +222,21 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
   }
 });
 
+app.delete("/api/content/series/:seriesId/episode/:episodeId", verifyAdmin, async (req, res) => {
+  try {
+    const { seriesId, episodeId } = req.params;
+    const series = await Series.findById(seriesId);
+    if (!series) return res.status(404).json({ error: "Series not found" });
+
+    // Filter out the episode to delete
+    series.episodes = series.episodes.filter(ep => ep._id.toString() !== episodeId);
+    
+    await series.save();
+    res.json(series);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
