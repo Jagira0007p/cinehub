@@ -31,9 +31,7 @@ const Admin = () => {
           await api.post(
             "/verify-admin",
             {},
-            {
-              headers: { "x-admin-password": savedPassword },
-            }
+            { headers: { "x-admin-password": savedPassword } }
           );
           setIsAuthenticated(true);
         } catch (error) {
@@ -53,9 +51,7 @@ const Admin = () => {
       await api.post(
         "/verify-admin",
         {},
-        {
-          headers: { "x-admin-password": password },
-        }
+        { headers: { "x-admin-password": password } }
       );
       localStorage.setItem("adminPassword", password);
       setIsAuthenticated(true);
@@ -69,7 +65,6 @@ const Admin = () => {
   };
 
   if (verifying) return null;
-
   if (!isAuthenticated)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4">
@@ -125,7 +120,6 @@ const Admin = () => {
             <Shield className="w-4 h-4" /> Logout
           </button>
         </div>
-
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: "content", label: "Manage Movies/Series", icon: Film },
@@ -144,7 +138,6 @@ const Admin = () => {
             </button>
           ))}
         </div>
-
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -160,7 +153,7 @@ const Admin = () => {
   );
 };
 
-// --- CONTENT MANAGER (UPDATED WITH BATCH LINKS) ---
+// --- CONTENT MANAGER ---
 const ContentManager = () => {
   const [items, setItems] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -174,7 +167,6 @@ const ContentManager = () => {
     year: new Date().getFullYear(),
     type: "movie",
     downloads: { p480: "", p720: "", p1080: "" },
-    // NEW: Batch Links
     batchLinks: { p480: "", p720: "", p1080: "" },
     poster: "",
     previewImages: [],
@@ -196,10 +188,16 @@ const ContentManager = () => {
 
   const handleEdit = (item) => {
     setEditingId(item._id);
+    // FIX: Convert Genre Array back to String for editing
+    const genreString = Array.isArray(item.genre)
+      ? item.genre.join(", ")
+      : item.genre;
+
     setFormData({
       ...item,
+      genre: genreString, // Display as "Action, Sci-Fi"
       downloads: item.downloads || initialForm.downloads,
-      batchLinks: item.batchLinks || initialForm.batchLinks, // Load batch links
+      batchLinks: item.batchLinks || initialForm.batchLinks,
       previewImages: item.previewImages || [],
       type: item.episodes ? "series" : "movie",
     });
@@ -319,7 +317,7 @@ const ContentManager = () => {
             <div className="grid grid-cols-2 gap-2">
               <input
                 className="p-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white"
-                placeholder="Genre"
+                placeholder="Genre (comma separated)"
                 value={formData.genre}
                 onChange={(e) =>
                   setFormData({ ...formData, genre: e.target.value })
@@ -365,12 +363,10 @@ const ContentManager = () => {
               </div>
             </div>
 
-            {/* MOVIE LINKS */}
+            {/* Links */}
             {formData.type === "movie" && (
               <div className="space-y-2 pt-2 border-t border-gray-700 mt-2">
-                <p className="text-xs font-bold text-blue-400">
-                  Movie Download Links
-                </p>
+                <p className="text-xs font-bold text-blue-400">Movie Links</p>
                 <input
                   className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
                   placeholder="480p Link"
@@ -415,16 +411,14 @@ const ContentManager = () => {
                 />
               </div>
             )}
-
-            {/* NEW: SERIES BATCH LINKS */}
             {formData.type === "series" && (
               <div className="space-y-2 pt-2 border-t border-gray-700 mt-2">
                 <p className="text-xs font-bold text-green-400">
-                  Series Batch Links (Zip/Folder)
+                  Series Batch Links
                 </p>
                 <input
                   className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="480p Batch Link"
+                  placeholder="480p Batch"
                   value={formData.batchLinks?.p480 || ""}
                   onChange={(e) =>
                     setFormData({
@@ -438,7 +432,7 @@ const ContentManager = () => {
                 />
                 <input
                   className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="720p Batch Link"
+                  placeholder="720p Batch"
                   value={formData.batchLinks?.p720 || ""}
                   onChange={(e) =>
                     setFormData({
@@ -452,7 +446,7 @@ const ContentManager = () => {
                 />
                 <input
                   className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="1080p Batch Link"
+                  placeholder="1080p Batch"
                   value={formData.batchLinks?.p1080 || ""}
                   onChange={(e) =>
                     setFormData({
@@ -502,7 +496,9 @@ const ContentManager = () => {
                   <div>
                     <p className="font-bold text-white">{item.title}</p>
                     <p className="text-xs text-gray-400">
-                      {item.episodes ? "Series" : "Movie"} • {item.year}
+                      {Array.isArray(item.genre)
+                        ? item.genre.join(", ")
+                        : item.genre}
                     </p>
                   </div>
                 </div>
@@ -531,7 +527,7 @@ const ContentManager = () => {
   );
 };
 
-// --- EPISODE MANAGER (UNCHANGED from previous correct version) ---
+// --- EPISODE MANAGER (Unchanged) ---
 const EpisodeManager = () => {
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeries, setSelectedSeries] = useState(null);

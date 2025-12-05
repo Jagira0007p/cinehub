@@ -123,7 +123,7 @@ const Navbar = () => {
     { path: "/", label: "Home", icon: Home },
     { path: "/movies", label: "Movies", icon: Film },
     { path: "/series", label: "Series", icon: Tv },
-    { path: "/admin", label: "Admin", icon: Lock },
+    // { path: "/admin", label: "Admin", icon: Lock },
   ];
 
   return (

@@ -35,7 +35,7 @@ const Footer = () => {
           >
             <h3 className="text-lg font-bold">Quick Links</h3>
             <ul className="space-y-2">
-              {["Movies", "Series", "Latest", "Trending"].map((item) => (
+              {["Movies", "Series"].map((item) => (
                 <li key={item}>
                   <a
                     href={`/${item.toLowerCase()}`}
@@ -94,7 +94,7 @@ const Footer = () => {
             </div>
             <p className="text-gray-400 text-sm">
               Made with <Heart className="inline w-4 h-4 text-red-500" /> by the
-              CinemaHub Team
+              DVStream Team
             </p>
           </motion.div>
         </div>

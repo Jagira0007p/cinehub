@@ -36,9 +36,16 @@ const verifyAdmin = (req, res, next) => {
   }
 };
 
-// --- PUBLIC ROUTES ---
+// Helper: Process Genre String to Array
+const processGenre = (genreInput) => {
+  if (!genreInput) return [];
+  if (Array.isArray(genreInput)) return genreInput;
+  // Split by comma and remove extra spaces
+  return genreInput.split(",").map((g) => g.trim());
+};
 
-// 1. Get Home Page Showcase
+// --- ROUTES ---
+
 app.get("/api/home", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 }).limit(6);
@@ -49,11 +56,12 @@ app.get("/api/home", async (req, res) => {
   }
 });
 
-// 2. Get Available Filters
 app.get("/api/filters/:type", async (req, res) => {
   try {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
+    // MongoDB 'distinct' works perfectly with Arrays!
+    // It will return unique genres like ["Action", "Sci-Fi"] automatically.
     const genres = await Model.distinct("genre");
     const years = await Model.distinct("year");
     res.json({
@@ -65,7 +73,6 @@ app.get("/api/filters/:type", async (req, res) => {
   }
 });
 
-// 3. Get List with Search & Pagination
 app.get("/api/list/:type", async (req, res) => {
   try {
     const { type } = req.params;
@@ -76,16 +83,16 @@ app.get("/api/list/:type", async (req, res) => {
 
     const query = {};
     if (search) query.title = { $regex: search, $options: "i" };
+
+    // Exact match works for Arrays too in MongoDB (If array contains "Action", it matches)
     if (genre) query.genre = genre;
     if (year) query.year = year;
 
     const Model = type === "movie" ? Movie : Series;
-
     const [items, total] = await Promise.all([
       Model.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Model.countDocuments(query),
     ]);
-
     res.json({
       items,
       totalPages: Math.ceil(total / limit),
@@ -117,30 +124,20 @@ app.get("/api/content", async (req, res) => {
   }
 });
 
-// --- ADMIN ROUTES ---
-
-// NEW: Real Stats Route
 app.get("/api/stats", async (req, res) => {
   try {
     const movieCount = await Movie.countDocuments();
     const seriesCount = await Series.countDocuments();
-
-    // Count total episodes
     const allSeries = await Series.find({}, "episodes");
     const episodeCount = allSeries.reduce(
       (acc, curr) => acc + (curr.episodes ? curr.episodes.length : 0),
       0
     );
-
-    // Get 5 most recent items for dashboard list
     const recentMovies = await Movie.find().sort({ createdAt: -1 }).limit(5);
     const recentSeries = await Series.find().sort({ createdAt: -1 }).limit(5);
-
-    // Combine and sort by date
     const recent = [...recentMovies, ...recentSeries]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5);
-
     res.json({
       movies: movieCount,
       series: seriesCount,
@@ -153,10 +150,9 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// Verification Route
-app.post("/api/verify-admin", verifyAdmin, (req, res) => {
-  res.status(200).json({ success: true, message: "Admin verified" });
-});
+app.post("/api/verify-admin", verifyAdmin, (req, res) =>
+  res.status(200).json({ success: true })
+);
 
 const upload = multer();
 app.post("/api/upload", verifyAdmin, upload.single("file"), (req, res) => {
@@ -171,11 +167,16 @@ app.post("/api/upload", verifyAdmin, upload.single("file"), (req, res) => {
   streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
 });
 
+// CREATE Content (With Genre Split)
 app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   try {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
-    const newItem = new Model(req.body);
+
+    // Process genre string into array
+    const data = { ...req.body, genre: processGenre(req.body.genre) };
+
+    const newItem = new Model(data);
     await newItem.save();
     res.json(newItem);
   } catch (err) {
@@ -183,13 +184,16 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   }
 });
 
+// UPDATE Content (With Genre Split)
 app.put("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   try {
     const { type, id } = req.params;
     const Model = type === "movie" ? Movie : Series;
-    const updatedItem = await Model.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+
+    // Process genre string into array
+    const data = { ...req.body, genre: processGenre(req.body.genre) };
+
+    const updatedItem = await Model.findByIdAndUpdate(id, data, { new: true });
     res.json(updatedItem);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -207,14 +211,13 @@ app.delete("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   }
 });
 
+// Episode Routes (Keep unchanged)
 app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, episodeNumber, downloads } = req.body;
     const series = await Series.findById(id);
     if (!series) return res.status(404).json({ error: "Series not found" });
-
-    series.episodes.push({ title, episodeNumber, downloads });
+    series.episodes.push(req.body);
     await series.save();
     res.json(series);
   } catch (err) {
@@ -222,19 +225,68 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
   }
 });
 
-app.delete("/api/content/series/:seriesId/episode/:episodeId", verifyAdmin, async (req, res) => {
-  try {
-    const { seriesId, episodeId } = req.params;
-    const series = await Series.findById(seriesId);
-    if (!series) return res.status(404).json({ error: "Series not found" });
+app.put(
+  "/api/content/series/:seriesId/episode/:episodeId",
+  verifyAdmin,
+  async (req, res) => {
+    try {
+      const { seriesId, episodeId } = req.params;
+      const series = await Series.findById(seriesId);
+      if (!series) return res.status(404).json({ error: "Series not found" });
+      const episode = series.episodes.id(episodeId);
+      if (!episode) return res.status(404).json({ error: "Episode not found" });
+      episode.title = req.body.title;
+      episode.episodeNumber = req.body.episodeNumber;
+      episode.downloads = req.body.downloads;
+      await series.save();
+      res.json(series);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
-    // Filter out the episode to delete
-    series.episodes = series.episodes.filter(ep => ep._id.toString() !== episodeId);
-    
-    await series.save();
-    res.json(series);
+app.delete(
+  "/api/content/series/:seriesId/episode/:episodeId",
+  verifyAdmin,
+  async (req, res) => {
+    try {
+      const { seriesId, episodeId } = req.params;
+      const series = await Series.findById(seriesId);
+      if (!series) return res.status(404).json({ error: "Series not found" });
+      series.episodes = series.episodes.filter(
+        (ep) => ep._id.toString() !== episodeId
+      );
+      await series.save();
+      res.json(series);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// Sitemap route (Keep unchanged)
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    const movies = await Movie.find({}, "_id updatedAt");
+    const series = await Series.find({}, "_id updatedAt");
+    const baseUrl = "https://cinemahub.xyz";
+    let xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url><url><loc>${baseUrl}/movies</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
+    movies.forEach((movie) => {
+      xml += `<url><loc>${baseUrl}/movie/${movie._id}</loc><lastmod>${new Date(
+        movie.updatedAt
+      ).toISOString()}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`;
+    });
+    series.forEach((s) => {
+      xml += `<url><loc>${baseUrl}/series/${s._id}</loc><lastmod>${new Date(
+        s.updatedAt
+      ).toISOString()}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`;
+    });
+    xml += `</urlset>`;
+    res.header("Content-Type", "application/xml");
+    res.send(xml);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).end();
   }
 });
 

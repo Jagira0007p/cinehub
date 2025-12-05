@@ -14,11 +14,11 @@ const seriesSchema = new mongoose.Schema(
   {
     title: String,
     description: String,
-    genre: String,
+    // CHANGED: genre is now an Array of Strings
+    genre: [String],
     year: Number,
     poster: String,
     previewImages: [String],
-    // NEW: Add Batch Links Field
     batchLinks: {
       p480: String,
       p720: String,

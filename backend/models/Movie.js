@@ -4,10 +4,11 @@ const movieSchema = new mongoose.Schema(
   {
     title: String,
     description: String,
-    genre: String,
+    // CHANGED: genre is now an Array of Strings
+    genre: [String],
     year: Number,
-    poster: String, // URL from Cloudinary
-    previewImages: [String], // Array of 4 URLs
+    poster: String,
+    previewImages: [String],
     downloads: {
       p480: String,
       p720: String,
