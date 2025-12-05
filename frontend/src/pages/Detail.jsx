@@ -4,17 +4,14 @@ import api from "../api";
 import {
   Download,
   PlayCircle,
-  Star,
-  Clock,
-  Calendar,
-  Users,
   Share2,
   Bookmark,
   X,
   Copy,
   CheckCircle,
-  Layers,
   FolderDown,
+  ExternalLink,
+  Layers,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
@@ -23,6 +20,8 @@ const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
+
+  // Modals
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchQuality, setBatchQuality] = useState("720p");
@@ -68,8 +67,12 @@ const Detail = () => {
     }
   };
 
+  // Helper to safely get the batch link
   const getBatchLink = () => {
-    return item?.batchLinks?.[`p${batchQuality.replace("p", "")}`];
+    if (!item?.batchLinks) return null;
+    // Handle both "p720" and "720p" formats just in case
+    const key = `p${batchQuality.replace("p", "")}`;
+    return item.batchLinks[key];
   };
 
   const copyBatchLinks = () => {
@@ -79,17 +82,20 @@ const Detail = () => {
       .map((ep) => ep.downloads?.[`p${batchQuality.replace("p", "")}`])
       .filter((link) => link)
       .join("\n");
+
     navigator.clipboard.writeText(links);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (!item)
-    return <div className="text-center py-20 text-gray-400">Loading...</div>;
+    return (
+      <div className="text-center py-20 text-gray-400">Loading content...</div>
+    );
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
-      {/* Hero Banner */}
+      {/* HERO BANNER */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -147,6 +153,7 @@ const Detail = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          {/* SYNOPSIS */}
           <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
             <h2 className="text-2xl font-bold mb-4 border-l-4 border-red-500 pl-3">
               Synopsis
@@ -195,11 +202,12 @@ const Detail = () => {
                   <Layers className="text-red-500" /> Episodes (
                   {item.episodes.length})
                 </h3>
+                {/* Batch Button */}
                 <button
                   onClick={() => setShowBatchModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-full text-sm border border-gray-600 transition"
+                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-red-600 to-orange-500 rounded-full font-bold shadow-lg hover:shadow-red-500/20 transition"
                 >
-                  <FolderDown size={16} /> Batch / Season Pack
+                  <FolderDown size={18} /> Batch Download
                 </button>
               </div>
 
@@ -238,10 +246,30 @@ const Detail = () => {
             </div>
           )}
         </div>
-        <div className="space-y-6">{/* Sidebar Info can go here */}</div>
+
+        {/* Sidebar Info */}
+        <div className="space-y-6">
+          <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
+            <h3 className="text-xl font-bold mb-4">Details</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Released</span>
+                <span>{item.year}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Genre</span>
+                <span>{item.genre}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Format</span>
+                <span>MKV / MP4</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* EPISODE POPUP */}
+      {/* --- EPISODE POPUP (SINGLE EPISODE) --- */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -292,7 +320,7 @@ const Detail = () => {
                   (x) => x
                 ) && (
                   <p className="text-center text-gray-500">
-                    No links available.
+                    No links added for this episode.
                   </p>
                 )}
               </div>
@@ -301,7 +329,7 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
-      {/* BATCH DOWNLOAD MODAL */}
+      {/* --- BATCH DOWNLOAD MODAL --- */}
       <AnimatePresence>
         {showBatchModal && (
           <motion.div
@@ -323,6 +351,7 @@ const Detail = () => {
               >
                 <X />
               </button>
+
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <FolderDown className="text-red-500" /> Batch Download
               </h3>
@@ -346,35 +375,54 @@ const Detail = () => {
                 </div>
               </div>
 
-              {/* LOGIC: IF BATCH LINK EXISTS, SHOW BUTTON. ELSE SHOW COPY LIST */}
+              {/* LOGIC: DIRECT LINK vs COPY LIST */}
               {getBatchLink() ? (
-                <div className="text-center py-6">
+                /* SCENARIO 1: Batch Link Exists in Admin -> Show Direct Button */
+                <div className="text-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
+                  <div className="mb-4">
+                    <p className="text-green-400 font-medium mb-1">
+                      Single Link Available!
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Click below to open the complete season folder.
+                    </p>
+                  </div>
                   <a
                     href={getBatchLink()}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 mb-2"
+                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 shadow-lg mb-2"
                   >
-                    <Download size={20} /> Download Complete Season (
-                    {batchQuality})
+                    <ExternalLink size={20} /> Open {batchQuality} Season Pack
                   </a>
-                  <p className="text-xs text-gray-500">
-                    Direct Zip/Folder Link
-                  </p>
                 </div>
               ) : (
+                /* SCENARIO 2: No Batch Link -> Show Copy List */
                 <>
-                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
-                      {item.episodes
-                        .sort((a, b) => a.episodeNumber - b.episodeNumber)
-                        .map(
-                          (ep) =>
-                            ep.downloads?.[`p${batchQuality.replace("p", "")}`]
-                        )
-                        .filter((l) => l)
-                        .join("\n") || "No individual links found."}
-                    </pre>
+                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs text-orange-400 font-bold">
+                        ⚠️ No Batch Folder Found
+                      </p>
+                      <p className="text-[10px] text-gray-500">
+                        Showing individual episode links
+                      </p>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                      <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
+                        {item.episodes
+                          .sort((a, b) => a.episodeNumber - b.episodeNumber)
+                          .map(
+                            (ep) =>
+                              ep.downloads?.[
+                                `p${batchQuality.replace("p", "")}`
+                              ]
+                          )
+                          .filter((l) => l)
+                          .join("\n") ||
+                          "No individual links found for this quality."}
+                      </pre>
+                    </div>
                   </div>
                   <button
                     onClick={copyBatchLinks}
@@ -384,8 +432,8 @@ const Detail = () => {
                       <CheckCircle className="text-green-600" />
                     ) : (
                       <Copy size={18} />
-                    )}{" "}
-                    {copied ? "Copied!" : "Copy Individual Links"}
+                    )}
+                    {copied ? "Copied!" : "Copy All Links (For IDM)"}
                   </button>
                 </>
               )}
