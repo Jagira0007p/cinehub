@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import SEO from "../components/SEO"; // SEO Component
+// SEO Component
 import AdBanner from "../components/AdBanner"; // ✅ Ad Banner Imported
 
 const Detail = () => {
