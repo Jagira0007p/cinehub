@@ -16,20 +16,18 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import AdBanner from "../components/AdBanner"; // Ad Banner Imported
+import AdBanner from "../components/AdBanner";
+import NativeAd from "../components/NativeAd"; // ✅ IMPORT THIS
 
 const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
-  // Modals
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchQuality, setBatchQuality] = useState("720p");
   const [copied, setCopied] = useState(false);
-
-  // Screenshot Viewer Modal
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
@@ -80,7 +78,6 @@ const Detail = () => {
       .map((ep) => ep.downloads?.[`p${batchQuality.replace("p", "")}`])
       .filter((link) => link)
       .join("\n");
-
     navigator.clipboard.writeText(links);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -165,6 +162,9 @@ const Detail = () => {
             </p>
           </div>
 
+          {/* ✅ NATIVE AD BANNER (Integrated Naturally) */}
+          <NativeAd />
+
           {/* SCREENSHOTS */}
           {item.previewImages && item.previewImages.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
@@ -190,7 +190,7 @@ const Detail = () => {
             </div>
           )}
 
-          {/* AD BANNER 1 (Above Downloads) */}
+          {/* STANDARD 728x90 AD BANNER */}
           <AdBanner />
 
           {/* MOVIE DOWNLOADS */}
@@ -239,7 +239,6 @@ const Detail = () => {
                   <FolderDown size={18} /> Batch Download
                 </button>
               </div>
-
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {item.episodes
                   ?.sort((a, b) => a.episodeNumber - b.episodeNumber)
@@ -292,14 +291,14 @@ const Detail = () => {
             </div>
           </div>
 
-          {/* AD BANNER 2 (Sidebar) */}
+          {/* SIDEBAR AD BANNER */}
           <div className="sticky top-24">
             <AdBanner />
           </div>
         </div>
       </div>
 
-      {/* --- PREVIEW IMAGE MODAL --- */}
+      {/* --- MODALS (PREVIEW, EPISODE, BATCH) --- */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
@@ -324,7 +323,6 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
-      {/* --- EPISODE POPUP --- */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -382,7 +380,6 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
-      {/* --- BATCH DOWNLOAD MODAL --- */}
       <AnimatePresence>
         {showBatchModal && (
           <motion.div
@@ -404,11 +401,9 @@ const Detail = () => {
               >
                 <X />
               </button>
-
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <FolderDown className="text-red-500" /> Batch Download
               </h3>
-
               <div className="mb-6">
                 <p className="text-sm text-gray-400 mb-2">Select Quality:</p>
                 <div className="flex gap-2">
@@ -427,7 +422,6 @@ const Detail = () => {
                   ))}
                 </div>
               </div>
-
               {getBatchLink() ? (
                 <div className="text-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
                   <div className="mb-4">
@@ -469,7 +463,7 @@ const Detail = () => {
                       <CheckCircle className="text-green-600" />
                     ) : (
                       <Copy size={18} />
-                    )}
+                    )}{" "}
                     {copied ? "Copied!" : "Copy All Links (For IDM)"}
                   </button>
                 </>
