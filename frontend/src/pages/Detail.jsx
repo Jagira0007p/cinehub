@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
+import SEO from "../components/SEO"; // SEO Component
+import AdBanner from "../components/AdBanner"; // ✅ Ad Banner Imported
 
 const Detail = () => {
   const { type, id } = useParams();
@@ -54,7 +56,7 @@ const Detail = () => {
       try {
         await navigator.share({
           title: item?.title,
-          text: `Check out ${item?.title}`,
+          text: `Check out ${item?.title} on DVStream`,
           url: window.location.href,
         });
       } catch (err) {
@@ -66,7 +68,6 @@ const Detail = () => {
     }
   };
 
-  // Helper to safely get the batch link
   const getBatchLink = () => {
     if (!item?.batchLinks) return null;
     const key = `p${batchQuality.replace("p", "")}`;
@@ -93,6 +94,14 @@ const Detail = () => {
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
+      {/* SEO META TAGS */}
+      <SEO
+        title={item.title}
+        description={item.description}
+        image={item.poster}
+        type={type === "movie" ? "video.movie" : "video.tv_show"}
+      />
+
       {/* HERO BANNER */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -165,7 +174,7 @@ const Detail = () => {
             </p>
           </div>
 
-          {/* --- NEW: PREVIEW IMAGES (SCREENSHOTS) --- */}
+          {/* SCREENSHOTS */}
           {item.previewImages && item.previewImages.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -190,6 +199,9 @@ const Detail = () => {
             </div>
           )}
 
+          {/* ✅ AD BANNER 1 (Above Downloads) */}
+          <AdBanner />
+
           {/* MOVIE DOWNLOADS */}
           {type === "movie" && item.downloads && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
@@ -212,7 +224,7 @@ const Detail = () => {
                           </span>
                         </div>
                         <span className="text-xs bg-gray-800 px-3 py-1 rounded-full">
-                          Download
+                          Fast Download
                         </span>
                       </a>
                     )
@@ -273,7 +285,7 @@ const Detail = () => {
           )}
         </div>
 
-        {/* Sidebar Info */}
+        {/* SIDEBAR */}
         <div className="space-y-6">
           <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
             <h3 className="text-xl font-bold mb-4">Details</h3>
@@ -288,10 +300,15 @@ const Detail = () => {
               </div>
             </div>
           </div>
+
+          {/* ✅ AD BANNER 2 (Sidebar) */}
+          <div className="sticky top-24">
+            <AdBanner />
+          </div>
         </div>
       </div>
 
-      {/* --- PREVIEW IMAGE MODAL (Lightroom Style) --- */}
+      {/* --- PREVIEW IMAGE MODAL --- */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
@@ -366,9 +383,7 @@ const Detail = () => {
                 {!Object.values(selectedEpisode.downloads || {}).some(
                   (x) => x
                 ) && (
-                  <p className="text-center text-gray-500">
-                    No links added for this episode.
-                  </p>
+                  <p className="text-center text-gray-500">No links added.</p>
                 )}
               </div>
             </motion.div>
