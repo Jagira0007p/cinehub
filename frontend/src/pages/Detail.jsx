@@ -16,8 +16,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-// SEO Component
-import AdBanner from "../components/AdBanner"; // ✅ Ad Banner Imported
+import AdBanner from "../components/AdBanner"; // Ad Banner Imported
 
 const Detail = () => {
   const { type, id } = useParams();
@@ -94,14 +93,6 @@ const Detail = () => {
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
-      {/* SEO META TAGS */}
-      <SEO
-        title={item.title}
-        description={item.description}
-        image={item.poster}
-        type={type === "movie" ? "video.movie" : "video.tv_show"}
-      />
-
       {/* HERO BANNER */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -199,7 +190,7 @@ const Detail = () => {
             </div>
           )}
 
-          {/* ✅ AD BANNER 1 (Above Downloads) */}
+          {/* AD BANNER 1 (Above Downloads) */}
           <AdBanner />
 
           {/* MOVIE DOWNLOADS */}
@@ -301,7 +292,7 @@ const Detail = () => {
             </div>
           </div>
 
-          {/* ✅ AD BANNER 2 (Sidebar) */}
+          {/* AD BANNER 2 (Sidebar) */}
           <div className="sticky top-24">
             <AdBanner />
           </div>
