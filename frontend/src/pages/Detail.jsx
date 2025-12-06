@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
+import AdBanner from "../components/AdBanner"; // ✅ Import AdBanner
 
 const Detail = () => {
   const { type, id } = useParams();
@@ -185,6 +186,10 @@ const Detail = () => {
             </div>
           )}
 
+          {/* ✅ CLICKADU BANNER 1 (Main) */}
+          {/* Replace 'YOUR_ZONE_ID' with number from Clickadu, e.g. "123456" */}
+          <AdBanner zoneId="YOUR_CLICKADU_MAIN_ZONE_ID" />
+
           {/* MOVIE DOWNLOADS */}
           {type === "movie" && item.downloads && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
@@ -282,10 +287,15 @@ const Detail = () => {
               </div>
             </div>
           </div>
+
+          {/* ✅ CLICKADU BANNER 2 (Sidebar) */}
+          <div className="sticky top-24">
+            <AdBanner zoneId="YOUR_CLICKADU_SIDEBAR_ZONE_ID" />
+          </div>
         </div>
       </div>
 
-      {/* --- MODALS (PREVIEW, EPISODE, BATCH) --- */}
+      {/* --- MODALS (Unchanged) --- */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
