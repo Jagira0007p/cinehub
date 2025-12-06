@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import AdBanner from "../components/AdBanner";
-import NativeAd from "../components/NativeAd"; // ✅ IMPORT THIS
 
 const Detail = () => {
   const { type, id } = useParams();
@@ -162,9 +160,6 @@ const Detail = () => {
             </p>
           </div>
 
-          {/* ✅ NATIVE AD BANNER (Integrated Naturally) */}
-          <NativeAd />
-
           {/* SCREENSHOTS */}
           {item.previewImages && item.previewImages.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
@@ -189,9 +184,6 @@ const Detail = () => {
               </div>
             </div>
           )}
-
-          {/* STANDARD 728x90 AD BANNER */}
-          <AdBanner />
 
           {/* MOVIE DOWNLOADS */}
           {type === "movie" && item.downloads && (
@@ -289,11 +281,6 @@ const Detail = () => {
                 <span>MKV / MP4</span>
               </div>
             </div>
-          </div>
-
-          {/* SIDEBAR AD BANNER */}
-          <div className="sticky top-24">
-            <AdBanner />
           </div>
         </div>
       </div>
