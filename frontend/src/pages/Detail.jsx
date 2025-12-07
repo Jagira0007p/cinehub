@@ -399,7 +399,7 @@ const Detail = () => {
                 <X />
               </button>
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <FolderDown className="text-red-500" /> Batch Download
+                <FolderDown className="text-red-500" /> All Episodes Download
               </h3>
               <div className="mb-6">
                 <p className="text-sm text-gray-400 mb-2">Select Quality:</p>
