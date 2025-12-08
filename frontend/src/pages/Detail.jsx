@@ -16,17 +16,25 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
-import AdBanner from "../components/AdBanner"; // ✅ Import AdBanner
+import AdBanner from "../components/AdBanner";
+
+// ---------------------------------------------------------
+// 1. PASTE YOUR SMART LINK (DIRECT LINK) HERE
+// ---------------------------------------------------------
+const SMART_LINK_URL = "https://otieu.com/4/10286714";
 
 const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
+  // Modals
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchQuality, setBatchQuality] = useState("720p");
   const [copied, setCopied] = useState(false);
+
+  // Screenshot Viewer
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
@@ -64,6 +72,23 @@ const Detail = () => {
     }
   };
 
+  // --- 2. NEW: SMART DOWNLOAD HANDLER ---
+  // This opens the Ad in a new tab AND the File in the current tab
+  const handleSmartDownload = (e, fileLink) => {
+    e.preventDefault(); // Stop default link behavior
+
+    // 1. Open the Ad (Smart Link) in a NEW TAB
+    if (SMART_LINK_URL && SMART_LINK_URL.startsWith("http")) {
+      window.open(SMART_LINK_URL, "_blank");
+    }
+
+    // 2. Open the Actual File in the CURRENT TAB (or redirect to it)
+    // Using setTimeout ensures the browser registers the first popup before navigating
+    setTimeout(() => {
+      window.location.href = fileLink;
+    }, 100);
+  };
+
   const getBatchLink = () => {
     if (!item?.batchLinks) return null;
     const key = `p${batchQuality.replace("p", "")}`;
@@ -77,6 +102,7 @@ const Detail = () => {
       .map((ep) => ep.downloads?.[`p${batchQuality.replace("p", "")}`])
       .filter((link) => link)
       .join("\n");
+
     navigator.clipboard.writeText(links);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -186,11 +212,10 @@ const Detail = () => {
             </div>
           )}
 
-          {/* ✅ CLICKADU BANNER 1 (Main) */}
-          {/* Replace 'YOUR_ZONE_ID' with number from Clickadu, e.g. "123456" */}
+          {/* AD BANNER 1 */}
           <AdBanner zoneId="YOUR_CLICKADU_MAIN_ZONE_ID" />
 
-          {/* MOVIE DOWNLOADS */}
+          {/* MOVIE DOWNLOADS (Updated with Smart Link Logic) */}
           {type === "movie" && item.downloads && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
               <h2 className="text-2xl font-bold mb-6">Download Links</h2>
@@ -201,9 +226,8 @@ const Detail = () => {
                       <a
                         key={quality}
                         href={link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition"
+                        onClick={(e) => handleSmartDownload(e, link)} // ✅ Trigger Smart Link
+                        className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
                           <Download size={20} className="text-red-500" />
@@ -236,6 +260,7 @@ const Detail = () => {
                   <FolderDown size={18} /> Batch Download
                 </button>
               </div>
+
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {item.episodes
                   ?.sort((a, b) => a.episodeNumber - b.episodeNumber)
@@ -288,14 +313,14 @@ const Detail = () => {
             </div>
           </div>
 
-          {/* ✅ CLICKADU BANNER 2 (Sidebar) */}
+          {/* SIDEBAR AD BANNER */}
           <div className="sticky top-24">
             <AdBanner zoneId="YOUR_CLICKADU_SIDEBAR_ZONE_ID" />
           </div>
         </div>
       </div>
 
-      {/* --- MODALS (Unchanged) --- */}
+      {/* --- PREVIEW IMAGE MODAL --- */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
@@ -320,6 +345,7 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
+      {/* --- EPISODE POPUP (Updated with Smart Links) --- */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -353,9 +379,8 @@ const Detail = () => {
                       <a
                         key={res}
                         href={link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group"
+                        onClick={(e) => handleSmartDownload(e, link)} // ✅ Smart Link Here too
+                        className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group cursor-pointer"
                       >
                         <span className="font-bold text-lg uppercase">
                           {res.replace("p", "")}p
@@ -377,6 +402,7 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
+      {/* --- BATCH DOWNLOAD MODAL (Updated with Smart Links) --- */}
       <AnimatePresence>
         {showBatchModal && (
           <motion.div
@@ -398,9 +424,11 @@ const Detail = () => {
               >
                 <X />
               </button>
+
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <FolderDown className="text-red-500" /> All Episodes Download
               </h3>
+
               <div className="mb-6">
                 <p className="text-sm text-gray-400 mb-2">Select Quality:</p>
                 <div className="flex gap-2">
@@ -419,6 +447,7 @@ const Detail = () => {
                   ))}
                 </div>
               </div>
+
               {getBatchLink() ? (
                 <div className="text-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
                   <div className="mb-4">
@@ -431,9 +460,8 @@ const Detail = () => {
                   </div>
                   <a
                     href={getBatchLink()}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 shadow-lg mb-2"
+                    onClick={(e) => handleSmartDownload(e, getBatchLink())} // ✅ Smart Link Here
+                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 shadow-lg mb-2 cursor-pointer"
                   >
                     <ExternalLink size={20} /> Open {batchQuality} Season Pack
                   </a>
@@ -460,7 +488,7 @@ const Detail = () => {
                       <CheckCircle className="text-green-600" />
                     ) : (
                       <Copy size={18} />
-                    )}{" "}
+                    )}
                     {copied ? "Copied!" : "Copy All Links (For IDM)"}
                   </button>
                 </>
