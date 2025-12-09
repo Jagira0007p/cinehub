@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import api from "../api";
 import {
   Download,
-  PlayCircle,
   Share2,
   Bookmark,
   X,
@@ -18,23 +17,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import AdBanner from "../components/AdBanner";
 
-// ---------------------------------------------------------
-// 1. PASTE YOUR SMART LINK (DIRECT LINK) HERE
-// ---------------------------------------------------------
-const SMART_LINK_URL = "https://otieu.com/4/10286714";
+const MONETAG_LINK = "https://otieu.com/4/10286714";
+const ADSTERRA_LINK = "https://your-adsterra-link.com/direct";
 
 const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
-
-  // Modals
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   const [showBatchModal, setShowBatchModal] = useState(false);
-  const [batchQuality, setBatchQuality] = useState("720p");
   const [copied, setCopied] = useState(false);
-
-  // Screenshot Viewer
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
@@ -60,62 +52,75 @@ const Detail = () => {
       try {
         await navigator.share({
           title: item?.title,
-          text: `Check out ${item?.title} on DVStream`,
           url: window.location.href,
         });
-      } catch (err) {
-        console.log(err);
-      }
+      } catch (err) {}
     } else {
       navigator.clipboard.writeText(window.location.href);
       alert("Link copied!");
     }
   };
 
-  // --- 2. NEW: SMART DOWNLOAD HANDLER ---
-  // This opens the Ad in a new tab AND the File in the current tab
   const handleSmartDownload = (e, fileLink) => {
-    e.preventDefault(); // Stop default link behavior
-
-    // 1. Open the Ad (Smart Link) in a NEW TAB
-    if (SMART_LINK_URL && SMART_LINK_URL.startsWith("http")) {
-      window.open(SMART_LINK_URL, "_blank");
-    }
-
-    // 2. Open the Actual File in the CURRENT TAB (or redirect to it)
-    // Using setTimeout ensures the browser registers the first popup before navigating
+    e.preventDefault();
+    const links = [MONETAG_LINK, ADSTERRA_LINK];
+    const randomAd = links[Math.floor(Math.random() * links.length)];
+    if (randomAd && randomAd.startsWith("http"))
+      window.open(randomAd, "_blank");
     setTimeout(() => {
       window.location.href = fileLink;
-    }, 100);
+    }, 500);
   };
 
-  const getBatchLink = () => {
-    if (!item?.batchLinks) return null;
-    const key = `p${batchQuality.replace("p", "")}`;
-    return item.batchLinks[key];
+  // ✅ HELPER: UNIFY OLD & NEW LINKS
+  const getUnifiedLinks = (data, isEpisode = false) => {
+    if (!data) return [];
+    // 1. Check New Array
+    if (data.downloadLinks && data.downloadLinks.length > 0)
+      return data.downloadLinks;
+    if (data.batchDownloadLinks && data.batchDownloadLinks.length > 0)
+      return data.batchDownloadLinks;
+
+    // 2. Fallback Old Object
+    const oldSource = isEpisode
+      ? data.downloads
+      : data.batchLinks || data.downloads;
+    if (oldSource) {
+      return Object.entries(oldSource)
+        .filter(([_, url]) => url)
+        .map(([key, url]) => ({
+          quality: key.replace("p", "") + "p",
+          size: "N/A",
+          url,
+        }));
+    }
+    return [];
   };
 
   const copyBatchLinks = () => {
     if (!item?.episodes) return;
     const links = item.episodes
       .sort((a, b) => a.episodeNumber - b.episodeNumber)
-      .map((ep) => ep.downloads?.[`p${batchQuality.replace("p", "")}`])
-      .filter((link) => link)
+      .flatMap((ep) => getUnifiedLinks(ep, true).map((l) => l.url))
       .join("\n");
-
     navigator.clipboard.writeText(links);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const formatGenre = (genre) =>
+    Array.isArray(genre) ? genre.join(", ") : genre;
 
   if (!item)
     return (
       <div className="text-center py-20 text-gray-400">Loading content...</div>
     );
 
+  const movieLinks = type === "movie" ? getUnifiedLinks(item) : [];
+  const batchLinks = type === "series" ? getUnifiedLinks(item) : [];
+
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
-      {/* HERO BANNER */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -133,7 +138,7 @@ const Detail = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-10" />
         <div className="relative z-20 container mx-auto px-4 h-full flex items-end pb-12">
           <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight">
+            <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight break-words">
               {item.title}
             </h1>
             <div className="flex flex-wrap gap-3 mb-6">
@@ -177,7 +182,6 @@ const Detail = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* SYNOPSIS */}
           <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
             <h2 className="text-2xl font-bold mb-4 border-l-4 border-red-500 pl-3">
               Synopsis
@@ -187,7 +191,6 @@ const Detail = () => {
             </p>
           </div>
 
-          {/* SCREENSHOTS */}
           {item.previewImages && item.previewImages.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
               <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -212,40 +215,41 @@ const Detail = () => {
             </div>
           )}
 
-          {/* AD BANNER 1 */}
           <AdBanner zoneId="YOUR_CLICKADU_MAIN_ZONE_ID" />
 
-          {/* MOVIE DOWNLOADS (Updated with Smart Link Logic) */}
-          {type === "movie" && item.downloads && (
+          {/* ✅ MOVIE DOWNLOADS (Dynamic Rendering) */}
+          {type === "movie" && movieLinks.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
               <h2 className="text-2xl font-bold mb-6">Download Links</h2>
               <div className="space-y-3">
-                {Object.entries(item.downloads).map(
-                  ([quality, link]) =>
-                    link && (
-                      <a
-                        key={quality}
-                        href={link}
-                        onClick={(e) => handleSmartDownload(e, link)} // ✅ Trigger Smart Link
-                        className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Download size={20} className="text-red-500" />
-                          <span className="font-bold uppercase">
-                            {quality.replace("p", "")}p
-                          </span>
-                        </div>
-                        <span className="text-xs bg-gray-800 px-3 py-1 rounded-full">
-                          Fast Download
+                {movieLinks.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    onClick={(e) => handleSmartDownload(e, link.url)}
+                    className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Download size={20} className="text-red-500" />
+                      <span className="font-bold uppercase">
+                        {link.quality}
+                      </span>
+                      {link.size && link.size !== "N/A" && (
+                        <span className="text-xs bg-gray-700 px-2 py-0.5 rounded text-gray-300">
+                          {link.size}
                         </span>
-                      </a>
-                    )
-                )}
+                      )}
+                    </div>
+                    <span className="text-xs bg-gray-800 px-3 py-1 rounded-full">
+                      Fast Download
+                    </span>
+                  </a>
+                ))}
               </div>
             </div>
           )}
 
-          {/* SERIES EPISODES */}
+          {/* SERIES */}
           {type === "series" && item.episodes && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
               <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
@@ -260,7 +264,6 @@ const Detail = () => {
                   <FolderDown size={18} /> Batch Download
                 </button>
               </div>
-
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {item.episodes
                   ?.sort((a, b) => a.episodeNumber - b.episodeNumber)
@@ -297,7 +300,6 @@ const Detail = () => {
           )}
         </div>
 
-        {/* SIDEBAR */}
         <div className="space-y-6">
           <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
             <h3 className="text-xl font-bold mb-4">Details</h3>
@@ -307,20 +309,21 @@ const Detail = () => {
                 <span>{item.year}</span>
               </div>
               <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Genre</span>
+                <span className="text-right">{formatGenre(item.genre)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Format</span>
                 <span>MKV / MP4</span>
               </div>
             </div>
           </div>
-
-          {/* SIDEBAR AD BANNER */}
           <div className="sticky top-24">
             <AdBanner zoneId="YOUR_CLICKADU_SIDEBAR_ZONE_ID" />
           </div>
         </div>
       </div>
 
-      {/* --- PREVIEW IMAGE MODAL --- */}
       <AnimatePresence>
         {previewImage && (
           <motion.div
@@ -345,7 +348,6 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
-      {/* --- EPISODE POPUP (Updated with Smart Links) --- */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -373,27 +375,31 @@ const Detail = () => {
               </h3>
               <p className="text-gray-400 mb-6">{selectedEpisode.title}</p>
               <div className="space-y-3">
-                {Object.entries(selectedEpisode.downloads || {}).map(
-                  ([res, link]) =>
-                    link ? (
-                      <a
-                        key={res}
-                        href={link}
-                        onClick={(e) => handleSmartDownload(e, link)} // ✅ Smart Link Here too
-                        className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group cursor-pointer"
-                      >
+                {/* ✅ EPISODE LINKS (Dynamic) */}
+                {getUnifiedLinks(selectedEpisode, true).length > 0 ? (
+                  getUnifiedLinks(selectedEpisode, true).map((link, i) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      onClick={(e) => handleSmartDownload(e, link.url)}
+                      className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group cursor-pointer"
+                    >
+                      <div className="flex flex-col">
                         <span className="font-bold text-lg uppercase">
-                          {res.replace("p", "")}p
+                          {link.quality}
                         </span>
-                        <div className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white">
-                          Download <Download size={16} />
-                        </div>
-                      </a>
-                    ) : null
-                )}
-                {!Object.values(selectedEpisode.downloads || {}).some(
-                  (x) => x
-                ) && (
+                        {link.size !== "N/A" && (
+                          <span className="text-xs text-gray-400">
+                            {link.size}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white">
+                        Download <Download size={16} />
+                      </div>
+                    </a>
+                  ))
+                ) : (
                   <p className="text-center text-gray-500">No links added.</p>
                 )}
               </div>
@@ -402,7 +408,6 @@ const Detail = () => {
         )}
       </AnimatePresence>
 
-      {/* --- BATCH DOWNLOAD MODAL (Updated with Smart Links) --- */}
       <AnimatePresence>
         {showBatchModal && (
           <motion.div
@@ -424,75 +429,55 @@ const Detail = () => {
               >
                 <X />
               </button>
-
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <FolderDown className="text-red-500" /> All Episodes Download
+                <FolderDown className="text-red-500" /> Batch Download
               </h3>
 
-              <div className="mb-6">
-                <p className="text-sm text-gray-400 mb-2">Select Quality:</p>
-                <div className="flex gap-2">
-                  {["480p", "720p", "1080p"].map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setBatchQuality(q)}
-                      className={`px-4 py-2 rounded-lg border text-sm font-bold transition ${
-                        batchQuality === q
-                          ? "bg-red-600 border-red-600 text-white"
-                          : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                      }`}
+              {/* ✅ BATCH LINKS (Dynamic) */}
+              {batchLinks.length > 0 ? (
+                <div className="space-y-3 mb-6">
+                  {batchLinks.map((link, i) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      onClick={(e) => handleSmartDownload(e, link.url)}
+                      className="flex items-center justify-between w-full py-4 px-6 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition shadow-lg cursor-pointer"
                     >
-                      {q}
-                    </button>
+                      <div className="flex items-center gap-2">
+                        <ExternalLink size={20} /> Open {link.quality} Pack
+                      </div>
+                      {link.size !== "N/A" && (
+                        <span className="text-xs bg-black text-white px-2 py-1 rounded">
+                          {link.size}
+                        </span>
+                      )}
+                    </a>
                   ))}
                 </div>
-              </div>
-
-              {getBatchLink() ? (
-                <div className="text-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
-                  <div className="mb-4">
-                    <p className="text-green-400 font-medium mb-1">
-                      Single Link Available!
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Click below to open the complete season folder.
-                    </p>
-                  </div>
-                  <a
-                    href={getBatchLink()}
-                    onClick={(e) => handleSmartDownload(e, getBatchLink())} // ✅ Smart Link Here
-                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 shadow-lg mb-2 cursor-pointer"
-                  >
-                    <ExternalLink size={20} /> Open {batchQuality} Season Pack
-                  </a>
-                </div>
               ) : (
-                <>
-                  <div className="bg-black/50 p-4 rounded-xl border border-gray-800 mb-4 max-h-48 overflow-y-auto">
-                    <pre className="text-xs text-green-400 whitespace-pre-wrap font-mono">
-                      {item.episodes
-                        .sort((a, b) => a.episodeNumber - b.episodeNumber)
-                        .map(
-                          (ep) =>
-                            ep.downloads?.[`p${batchQuality.replace("p", "")}`]
-                        )
-                        .filter((l) => l)
-                        .join("\n") || "No individual links found."}
-                    </pre>
-                  </div>
-                  <button
-                    onClick={copyBatchLinks}
-                    className="w-full py-3 bg-gray-800 border border-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition flex items-center justify-center gap-2"
-                  >
-                    {copied ? (
-                      <CheckCircle className="text-green-600" />
-                    ) : (
-                      <Copy size={18} />
-                    )}
-                    {copied ? "Copied!" : "Copy All Links (For IDM)"}
-                  </button>
-                </>
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-sm">
+                    No direct batch folders available.
+                  </p>
+                </div>
               )}
+
+              <div className="border-t border-gray-800 pt-4">
+                <p className="text-sm text-gray-400 mb-2">
+                  Or copy all individual links:
+                </p>
+                <button
+                  onClick={copyBatchLinks}
+                  className="w-full py-3 bg-gray-800 border border-gray-600 text-white font-bold rounded-xl hover:bg-gray-700 transition flex items-center justify-center gap-2"
+                >
+                  {copied ? (
+                    <CheckCircle className="text-green-600" />
+                  ) : (
+                    <Copy size={18} />
+                  )}{" "}
+                  {copied ? "Copied!" : "Copy All Links"}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

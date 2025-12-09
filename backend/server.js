@@ -40,7 +40,6 @@ const verifyAdmin = (req, res, next) => {
 const processGenre = (genreInput) => {
   if (!genreInput) return [];
   if (Array.isArray(genreInput)) return genreInput;
-  // Split by comma and remove extra spaces
   return genreInput.split(",").map((g) => g.trim());
 };
 
@@ -60,8 +59,6 @@ app.get("/api/filters/:type", async (req, res) => {
   try {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
-    // MongoDB 'distinct' works perfectly with Arrays!
-    // It will return unique genres like ["Action", "Sci-Fi"] automatically.
     const genres = await Model.distinct("genre");
     const years = await Model.distinct("year");
     res.json({
@@ -80,14 +77,10 @@ app.get("/api/list/:type", async (req, res) => {
     const limit = 20;
     const skip = (page - 1) * limit;
     const { search, genre, year } = req.query;
-
     const query = {};
     if (search) query.title = { $regex: search, $options: "i" };
-
-    // Exact match works for Arrays too in MongoDB (If array contains "Action", it matches)
     if (genre) query.genre = genre;
     if (year) query.year = year;
-
     const Model = type === "movie" ? Movie : Series;
     const [items, total] = await Promise.all([
       Model.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -167,15 +160,30 @@ app.post("/api/upload", verifyAdmin, upload.single("file"), (req, res) => {
   streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
 });
 
-// CREATE Content (With Genre Split)
+app.delete("/api/upload", verifyAdmin, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: "No URL provided" });
+    const parts = url.split("/");
+    const filename = parts.pop().split(".")[0];
+    const folder = parts.pop();
+    const publicId = `${folder}/${filename}`;
+    await cloudinary.uploader.destroy(publicId);
+    res.json({ message: "Image deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CREATE Content
 app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   try {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
-
-    // Process genre string into array
     const data = { ...req.body, genre: processGenre(req.body.genre) };
-
+    // NEW: Map batch links for series
+    if (type === "series")
+      data.batchDownloadLinks = req.body.batchDownloadLinks;
     const newItem = new Model(data);
     await newItem.save();
     res.json(newItem);
@@ -184,15 +192,12 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   }
 });
 
-// UPDATE Content (With Genre Split)
+// UPDATE Content
 app.put("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   try {
     const { type, id } = req.params;
     const Model = type === "movie" ? Movie : Series;
-
-    // Process genre string into array
     const data = { ...req.body, genre: processGenre(req.body.genre) };
-
     const updatedItem = await Model.findByIdAndUpdate(id, data, { new: true });
     res.json(updatedItem);
   } catch (err) {
@@ -211,7 +216,7 @@ app.delete("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   }
 });
 
-// Episode Routes (Keep unchanged)
+// Episode Routes
 app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -235,9 +240,12 @@ app.put(
       if (!series) return res.status(404).json({ error: "Series not found" });
       const episode = series.episodes.id(episodeId);
       if (!episode) return res.status(404).json({ error: "Episode not found" });
+
+      // Update fields
       episode.title = req.body.title;
       episode.episodeNumber = req.body.episodeNumber;
-      episode.downloads = req.body.downloads;
+      episode.downloadLinks = req.body.downloadLinks; // Array Update
+
       await series.save();
       res.json(series);
     } catch (err) {
@@ -264,30 +272,12 @@ app.delete(
     }
   }
 );
-app.delete("/api/upload", verifyAdmin, async (req, res) => {
-  try {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: "No URL provided" });
 
-    // Extract public_id from URL (e.g., .../movie-site/abc.jpg -> movie-site/abc)
-    const parts = url.split("/");
-    const filename = parts.pop().split(".")[0];
-    const folder = parts.pop();
-    const publicId = `${folder}/${filename}`;
-
-    await cloudinary.uploader.destroy(publicId);
-    res.json({ message: "Image deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Sitemap route (Keep unchanged)
 app.get("/sitemap.xml", async (req, res) => {
   try {
     const movies = await Movie.find({}, "_id updatedAt");
     const series = await Series.find({}, "_id updatedAt");
-    const baseUrl = "https://cinemahub.xyz";
+    const baseUrl = "https://dvstream.vercel.app";
     let xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url><url><loc>${baseUrl}/movies</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
     movies.forEach((movie) => {
       xml += `<url><loc>${baseUrl}/movie/${movie._id}</loc><lastmod>${new Date(

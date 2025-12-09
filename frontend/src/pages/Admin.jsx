@@ -3,6 +3,7 @@ import api, { getAdminHeaders } from "../api";
 import {
   Pencil,
   Trash2,
+  Save,
   X,
   Upload,
   Film,
@@ -11,12 +12,74 @@ import {
   Shield,
   Search,
   Loader2,
-  PlayCircle,
-  Clock,
-  CheckCircle,
+  Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
+
+// --- DYNAMIC LINK COMPONENT ---
+const DynamicLinks = ({ links, setLinks, label }) => {
+  const addLink = () => {
+    setLinks([...links, { quality: "", size: "", url: "" }]);
+  };
+
+  const updateLink = (index, field, value) => {
+    const newLinks = [...links];
+    newLinks[index][field] = value;
+    setLinks(newLinks);
+  };
+
+  const removeLink = (index) => {
+    setLinks(links.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3 pt-2">
+      <div className="flex justify-between items-center">
+        <p className="text-xs font-bold text-blue-400">{label}</p>
+        <button
+          type="button"
+          onClick={addLink}
+          className="text-xs flex items-center gap-1 bg-blue-600/20 text-blue-400 px-2 py-1 rounded hover:bg-blue-600/30 transition"
+        >
+          <Plus size={12} /> Add Link
+        </button>
+      </div>
+      {links.map((link, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input
+            className="w-1/4 p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
+            placeholder="Quality (e.g. 1080p)"
+            value={link.quality}
+            onChange={(e) => updateLink(i, "quality", e.target.value)}
+          />
+          <input
+            className="w-1/4 p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
+            placeholder="Size (e.g. 2.4GB)"
+            value={link.size}
+            onChange={(e) => updateLink(i, "size", e.target.value)}
+          />
+          <input
+            className="flex-1 p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
+            placeholder="Download URL"
+            value={link.url}
+            onChange={(e) => updateLink(i, "url", e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => removeLink(i)}
+            className="text-red-400 hover:text-red-300"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      ))}
+      {links.length === 0 && (
+        <p className="text-xs text-gray-500 italic">No links added.</p>
+      )}
+    </div>
+  );
+};
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState("content");
@@ -33,9 +96,7 @@ const Admin = () => {
           await api.post(
             "/verify-admin",
             {},
-            {
-              headers: { "x-admin-password": savedPassword },
-            }
+            { headers: { "x-admin-password": savedPassword } }
           );
           setIsAuthenticated(true);
         } catch (error) {
@@ -55,16 +116,13 @@ const Admin = () => {
       await api.post(
         "/verify-admin",
         {},
-        {
-          headers: { "x-admin-password": password },
-        }
+        { headers: { "x-admin-password": password } }
       );
       localStorage.setItem("adminPassword", password);
       setIsAuthenticated(true);
       toast.success("Welcome back!");
     } catch (error) {
       toast.error("Invalid Password!");
-      setPassword("");
     } finally {
       setLoading(false);
     }
@@ -127,7 +185,6 @@ const Admin = () => {
             <Shield className="w-4 h-4" /> Logout
           </button>
         </div>
-
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: "content", label: "Manage Movies/Series", icon: Film },
@@ -146,7 +203,6 @@ const Admin = () => {
             </button>
           ))}
         </div>
-
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -162,7 +218,7 @@ const Admin = () => {
   );
 };
 
-// --- CONTENT MANAGER (UPDATED) ---
+// --- CONTENT MANAGER ---
 const ContentManager = () => {
   const [items, setItems] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -175,8 +231,8 @@ const ContentManager = () => {
     genre: "",
     year: new Date().getFullYear(),
     type: "movie",
-    downloads: { p480: "", p720: "", p1080: "" },
-    batchLinks: { p480: "", p720: "", p1080: "" },
+    downloadLinks: [],
+    batchDownloadLinks: [], // Using new name matching Schema
     poster: "",
     previewImages: [],
   };
@@ -195,16 +251,46 @@ const ContentManager = () => {
     fetchContent();
   }, []);
 
+  // Convert old object format to new array format if needed
+  const convertOldLinks = (oldLinks) => {
+    if (!oldLinks) return [];
+    return Object.entries(oldLinks)
+      .filter(([_, url]) => url)
+      .map(([key, url]) => ({
+        quality: key.replace("p", "") + "p",
+        size: "N/A",
+        url: url,
+      }));
+  };
+
   const handleEdit = (item) => {
     setEditingId(item._id);
     const genreString = Array.isArray(item.genre)
       ? item.genre.join(", ")
       : item.genre;
+
+    // Auto-migrate on edit open
+    let dLinks = item.downloadLinks || [];
+    if (dLinks.length === 0 && item.downloads)
+      dLinks = convertOldLinks(item.downloads);
+
+    let bLinks = item.batchDownloadLinks || [];
+    // Check old batchLinks (which was object in Series schema previously)
+    if (
+      bLinks.length === 0 &&
+      item.batchLinks &&
+      !Array.isArray(item.batchLinks)
+    ) {
+      bLinks = convertOldLinks(item.batchLinks);
+    } else if (item.batchLinks && Array.isArray(item.batchLinks)) {
+      bLinks = item.batchLinks;
+    }
+
     setFormData({
       ...item,
       genre: genreString,
-      downloads: item.downloads || initialForm.downloads,
-      batchLinks: item.batchLinks || initialForm.batchLinks,
+      downloadLinks: dLinks,
+      batchDownloadLinks: bLinks,
       previewImages: item.previewImages || [],
       type: item.episodes ? "series" : "movie",
     });
@@ -212,39 +298,29 @@ const ContentManager = () => {
   };
 
   const handleDelete = async (id, type) => {
-    if (!confirm("Delete this item?")) return;
+    if (!confirm("Delete?")) return;
     try {
       await api.delete(`/content/${type}/${id}`, getAdminHeaders());
       toast.success("Deleted");
       fetchContent();
     } catch (error) {
-      toast.error("Failed to delete");
+      toast.error("Failed");
     }
   };
 
-  // --- NEW: DELETE IMAGE FUNCTION ---
-  const deleteImage = async (url, type, index = null) => {
-    if (!confirm("Are you sure you want to delete this image?")) return;
-
+  const deleteImage = async (url, type, index) => {
+    if (!confirm("Delete?")) return;
     try {
-      // 1. Delete from Cloudinary
-      await api.delete("/upload", {
-        data: { url },
-        ...getAdminHeaders(),
-      });
-
-      // 2. Update Form State
-      if (type === "poster") {
-        setFormData({ ...formData, poster: "" });
-      } else {
-        const newPreviews = formData.previewImages.filter(
-          (_, i) => i !== index
-        );
-        setFormData({ ...formData, previewImages: newPreviews });
-      }
-      toast.success("Image deleted");
-    } catch (error) {
-      toast.error("Failed to delete image");
+      await api.delete("/upload", { data: { url }, ...getAdminHeaders() });
+      if (type === "poster") setFormData({ ...formData, poster: "" });
+      else
+        setFormData({
+          ...formData,
+          previewImages: formData.previewImages.filter((_, i) => i !== index),
+        });
+      toast.success("Deleted image");
+    } catch (e) {
+      toast.error("Failed");
     }
   };
 
@@ -257,13 +333,11 @@ const ContentManager = () => {
     try {
       const res = await api.post("/upload", data, getAdminHeaders());
       if (type === "poster") {
-        // If a poster already exists, delete it first to keep Cloudinary clean
-        if (formData.poster) {
+        if (formData.poster)
           await api.delete("/upload", {
             data: { url: formData.poster },
             ...getAdminHeaders(),
           });
-        }
         setFormData({ ...formData, poster: res.data.url });
       } else {
         setFormData({
@@ -281,19 +355,16 @@ const ContentManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const payload = { ...formData }; // FormData already matches schema structure now
     try {
       if (editingId)
         await api.put(
           `/content/${formData.type}/${editingId}`,
-          formData,
+          payload,
           getAdminHeaders()
         );
       else
-        await api.post(
-          `/content/${formData.type}`,
-          formData,
-          getAdminHeaders()
-        );
+        await api.post(`/content/${formData.type}`, payload, getAdminHeaders());
       toast.success(editingId ? "Updated!" : "Created!");
       setEditingId(null);
       setFormData(initialForm);
@@ -376,7 +447,6 @@ const ContentManager = () => {
               />
             </div>
 
-            {/* Images Section Updated */}
             <div className="border-t border-gray-700 pt-4 space-y-4">
               <div>
                 <p className="text-xs font-bold mb-1">Poster</p>
@@ -395,14 +465,13 @@ const ContentManager = () => {
                     <button
                       type="button"
                       onClick={() => deleteImage(formData.poster, "poster")}
-                      className="absolute -top-2 -right-2 bg-red-600 p-1 rounded-full text-white shadow-lg hover:bg-red-700"
+                      className="absolute -top-2 -right-2 bg-red-600 p-1 rounded-full text-white shadow-lg"
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
                 )}
               </div>
-
               <div>
                 <p className="text-xs font-bold mb-1">Screenshots (Max 4)</p>
                 <input
@@ -421,7 +490,7 @@ const ContentManager = () => {
                       <button
                         type="button"
                         onClick={() => deleteImage(src, "preview", i)}
-                        className="absolute -top-1 -right-1 bg-red-600 p-0.5 rounded-full text-white shadow-md hover:bg-red-700"
+                        className="absolute -top-1 -right-1 bg-red-600 p-0.5 rounded-full text-white"
                       >
                         <X size={10} />
                       </button>
@@ -431,99 +500,25 @@ const ContentManager = () => {
               </div>
             </div>
 
-            {/* Links */}
+            {/* DYNAMIC LINKS */}
             {formData.type === "movie" && (
-              <div className="space-y-2 pt-2 border-t border-gray-700 mt-2">
-                <p className="text-xs font-bold text-blue-400">Movie Links</p>
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="480p Link"
-                  value={formData.downloads.p480}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      downloads: {
-                        ...formData.downloads,
-                        p480: e.target.value,
-                      },
-                    })
-                  }
-                />
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="720p Link"
-                  value={formData.downloads.p720}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      downloads: {
-                        ...formData.downloads,
-                        p720: e.target.value,
-                      },
-                    })
-                  }
-                />
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="1080p Link"
-                  value={formData.downloads.p1080}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      downloads: {
-                        ...formData.downloads,
-                        p1080: e.target.value,
-                      },
-                    })
+              <div className="border-t border-gray-700 mt-2">
+                <DynamicLinks
+                  label="Movie Links"
+                  links={formData.downloadLinks}
+                  setLinks={(l) =>
+                    setFormData({ ...formData, downloadLinks: l })
                   }
                 />
               </div>
             )}
             {formData.type === "series" && (
-              <div className="space-y-2 pt-2 border-t border-gray-700 mt-2">
-                <p className="text-xs font-bold text-green-400">
-                  Series Batch Links
-                </p>
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="480p Batch"
-                  value={formData.batchLinks?.p480 || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      batchLinks: {
-                        ...formData.batchLinks,
-                        p480: e.target.value,
-                      },
-                    })
-                  }
-                />
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="720p Batch"
-                  value={formData.batchLinks?.p720 || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      batchLinks: {
-                        ...formData.batchLinks,
-                        p720: e.target.value,
-                      },
-                    })
-                  }
-                />
-                <input
-                  className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                  placeholder="1080p Batch"
-                  value={formData.batchLinks?.p1080 || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      batchLinks: {
-                        ...formData.batchLinks,
-                        p1080: e.target.value,
-                      },
-                    })
+              <div className="border-t border-gray-700 mt-2">
+                <DynamicLinks
+                  label="Series Batch Links"
+                  links={formData.batchDownloadLinks}
+                  setLinks={(l) =>
+                    setFormData({ ...formData, batchDownloadLinks: l })
                   }
                 />
               </div>
@@ -539,6 +534,7 @@ const ContentManager = () => {
         </div>
       </div>
 
+      {/* List Section */}
       <div className="lg:col-span-2">
         <div className="glass-effect p-6 rounded-2xl">
           <div className="flex justify-between mb-4">
@@ -563,17 +559,12 @@ const ContentManager = () => {
                   />
                   <div>
                     <p className="font-bold text-white">{item.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {Array.isArray(item.genre)
-                        ? item.genre.join(", ")
-                        : item.genre}
-                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEdit(item)}
-                    className="p-2 bg-blue-600/20 rounded-lg text-blue-400"
+                    className="p-2 bg-blue-600/20 text-blue-400 rounded"
                   >
                     <Pencil size={16} />
                   </button>
@@ -595,17 +586,13 @@ const ContentManager = () => {
   );
 };
 
-// --- EPISODE MANAGER (Unchanged) ---
+// --- EPISODE MANAGER ---
 const EpisodeManager = () => {
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeries, setSelectedSeries] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editingEpId, setEditingEpId] = useState(null);
-  const initialForm = {
-    title: "",
-    episodeNumber: "",
-    downloads: { p480: "", p720: "", p1080: "" },
-  };
+  const initialForm = { title: "", episodeNumber: "", downloadLinks: [] };
   const [epForm, setEpForm] = useState(initialForm);
 
   useEffect(() => {
@@ -613,34 +600,32 @@ const EpisodeManager = () => {
   }, []);
 
   const handleSeriesSelect = async (e) => {
-    const sId = e.target.value;
-    if (!sId) {
+    if (!e.target.value) {
       setSelectedSeries(null);
       return;
     }
-    setLoading(true);
     try {
-      const res = await api.get(`/content/series/${sId}`);
+      const res = await api.get(`/content/series/${e.target.value}`);
       setSelectedSeries(res.data);
-      setEpForm(initialForm);
-      setEditingEpId(null);
-    } catch (error) {
-      toast.error("Failed to load");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) {}
   };
 
   const handleEditEp = (ep) => {
     setEditingEpId(ep._id);
+    let links = ep.downloadLinks || [];
+    if (links.length === 0 && ep.downloads) {
+      links = Object.entries(ep.downloads)
+        .filter(([_, url]) => url)
+        .map(([key, url]) => ({
+          quality: key.replace("p", "") + "p",
+          size: "N/A",
+          url,
+        }));
+    }
     setEpForm({
       title: ep.title,
       episodeNumber: ep.episodeNumber,
-      downloads: {
-        p480: ep.downloads?.p480 || "",
-        p720: ep.downloads?.p720 || "",
-        p1080: ep.downloads?.p1080 || "",
-      },
+      downloadLinks: links,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -742,48 +727,12 @@ const EpisodeManager = () => {
                   }
                   required
                 />
-                <div className="space-y-2">
-                  <input
-                    className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                    placeholder="480p Link"
-                    value={epForm.downloads.p480}
-                    onChange={(e) =>
-                      setEpForm({
-                        ...epForm,
-                        downloads: {
-                          ...epForm.downloads,
-                          p480: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                  <input
-                    className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                    placeholder="720p Link"
-                    value={epForm.downloads.p720}
-                    onChange={(e) =>
-                      setEpForm({
-                        ...epForm,
-                        downloads: {
-                          ...epForm.downloads,
-                          p720: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                  <input
-                    className="w-full p-2 bg-gray-900/50 border border-gray-700 rounded text-xs text-white"
-                    placeholder="1080p Link"
-                    value={epForm.downloads.p1080}
-                    onChange={(e) =>
-                      setEpForm({
-                        ...epForm,
-                        downloads: {
-                          ...epForm.downloads,
-                          p1080: e.target.value,
-                        },
-                      })
-                    }
+
+                <div className="border-t border-gray-700 pt-2">
+                  <DynamicLinks
+                    label="Episode Links"
+                    links={epForm.downloadLinks}
+                    setLinks={(l) => setEpForm({ ...epForm, downloadLinks: l })}
                   />
                 </div>
                 <button className="w-full bg-blue-600 py-3 rounded-xl font-bold">
