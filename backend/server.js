@@ -26,7 +26,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Admin Middleware
 const verifyAdmin = (req, res, next) => {
   const password = req.headers["x-admin-password"];
   if (password === process.env.ADMIN_SECRET) {
@@ -36,7 +35,6 @@ const verifyAdmin = (req, res, next) => {
   }
 };
 
-// Helper: Process Genre String to Array
 const processGenre = (genreInput) => {
   if (!genreInput) return [];
   if (Array.isArray(genreInput)) return genreInput;
@@ -45,10 +43,12 @@ const processGenre = (genreInput) => {
 
 // --- ROUTES ---
 
+// 1. Get Home Page Showcase (UPDATED SORTING)
 app.get("/api/home", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 }).limit(6);
-    const series = await Series.find().sort({ createdAt: -1 }).limit(6);
+    // ✅ CHANGED: Series now sorts by 'updatedAt' so new episodes bump to top
+    const series = await Series.find().sort({ updatedAt: -1 }).limit(6);
     res.json({ movies, series });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -70,6 +70,7 @@ app.get("/api/filters/:type", async (req, res) => {
   }
 });
 
+// 2. Get List (UPDATED SORTING)
 app.get("/api/list/:type", async (req, res) => {
   try {
     const { type } = req.params;
@@ -81,9 +82,14 @@ app.get("/api/list/:type", async (req, res) => {
     if (search) query.title = { $regex: search, $options: "i" };
     if (genre) query.genre = genre;
     if (year) query.year = year;
+
     const Model = type === "movie" ? Movie : Series;
+
+    // ✅ CHANGED: Logic to pick sort field
+    const sortField = type === "series" ? { updatedAt: -1 } : { createdAt: -1 };
+
     const [items, total] = await Promise.all([
-      Model.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Model.find(query).sort(sortField).skip(skip).limit(limit),
       Model.countDocuments(query),
     ]);
     res.json({
@@ -110,7 +116,7 @@ app.get("/api/content/:type/:id", async (req, res) => {
 app.get("/api/content", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 });
-    const series = await Series.find().sort({ createdAt: -1 });
+    const series = await Series.find().sort({ updatedAt: -1 }); // Admin also sees latest updated series
     res.json({ movies, series });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -127,9 +133,9 @@ app.get("/api/stats", async (req, res) => {
       0
     );
     const recentMovies = await Movie.find().sort({ createdAt: -1 }).limit(5);
-    const recentSeries = await Series.find().sort({ createdAt: -1 }).limit(5);
+    const recentSeries = await Series.find().sort({ updatedAt: -1 }).limit(5);
     const recent = [...recentMovies, ...recentSeries]
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
       .slice(0, 5);
     res.json({
       movies: movieCount,
@@ -181,7 +187,6 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
     const { type } = req.params;
     const Model = type === "movie" ? Movie : Series;
     const data = { ...req.body, genre: processGenre(req.body.genre) };
-    // NEW: Map batch links for series
     if (type === "series")
       data.batchDownloadLinks = req.body.batchDownloadLinks;
     const newItem = new Model(data);
@@ -222,7 +227,10 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
     const { id } = req.params;
     const series = await Series.findById(id);
     if (!series) return res.status(404).json({ error: "Series not found" });
+
     series.episodes.push(req.body);
+    // Force update of timestamp
+    series.markModified("episodes");
     await series.save();
     res.json(series);
   } catch (err) {
@@ -241,11 +249,12 @@ app.put(
       const episode = series.episodes.id(episodeId);
       if (!episode) return res.status(404).json({ error: "Episode not found" });
 
-      // Update fields
       episode.title = req.body.title;
       episode.episodeNumber = req.body.episodeNumber;
-      episode.downloadLinks = req.body.downloadLinks; // Array Update
+      episode.downloadLinks = req.body.downloadLinks;
 
+      // Force timestamp update
+      series.markModified("episodes");
       await series.save();
       res.json(series);
     } catch (err) {
@@ -277,7 +286,7 @@ app.get("/sitemap.xml", async (req, res) => {
   try {
     const movies = await Movie.find({}, "_id updatedAt");
     const series = await Series.find({}, "_id updatedAt");
-    const baseUrl = "https://dvstream.vercel.app";
+    const baseUrl = "https://dvstream-app.vercel.app";
     let xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrl}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url><url><loc>${baseUrl}/movies</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
     movies.forEach((movie) => {
       xml += `<url><loc>${baseUrl}/movie/${movie._id}</loc><lastmod>${new Date(

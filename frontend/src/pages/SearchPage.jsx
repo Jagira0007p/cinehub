@@ -50,6 +50,10 @@ const SearchPage = () => {
     }
   }, [activeTab, query, page]);
 
+  // Helper for Genres
+  const formatGenre = (genre) =>
+    Array.isArray(genre) ? genre.join(", ") : genre;
+
   return (
     <div className="min-h-screen container mx-auto px-4 py-8">
       {/* Header */}
@@ -138,13 +142,14 @@ const SearchPage = () => {
                       </div>
                     </div>
                     <div className="p-3">
-                      <h3 className="font-semibold truncate text-white group-hover:text-red-400 transition">
+                      {/* ✅ FIXED: Removed truncate, added break-words */}
+                      <h3 className="font-semibold break-words text-white group-hover:text-red-400 transition leading-tight">
                         {item.title}
                       </h3>
                       <div className="flex justify-between text-xs text-gray-400 mt-1">
                         <span>{item.year}</span>
                         <span className="bg-gray-700 px-2 py-0.5 rounded capitalize">
-                          {item.genre}
+                          {formatGenre(item.genre)}
                         </span>
                       </div>
                     </div>

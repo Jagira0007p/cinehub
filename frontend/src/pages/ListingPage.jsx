@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
-  Search,
-  X,
   Filter,
   Grid,
   List,
@@ -21,7 +19,6 @@ const ListingPage = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
   const [showFilters, setShowFilters] = useState(false);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -67,7 +64,6 @@ const ListingPage = ({ type }) => {
     fetchData();
   }, [type, page, debouncedSearch, selectedGenre, selectedYear]);
 
-  // Handlers
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setPage(1);
@@ -86,10 +82,15 @@ const ListingPage = ({ type }) => {
     setSelectedYear("");
     setPage(1);
   };
-
-  // Helper to join genres
   const formatGenre = (genre) =>
     Array.isArray(genre) ? genre.join(", ") : genre;
+
+  // ✅ Helper for Episode Badge
+  const getLatestEp = (item) => {
+    if (type !== "series" || !item.episodes || item.episodes.length === 0)
+      return null;
+    return Math.max(...item.episodes.map((e) => e.episodeNumber));
+  };
 
   const FilterSection = () => (
     <motion.div
@@ -227,7 +228,13 @@ const ListingPage = ({ type }) => {
                           className="w-full h-full object-cover transform group-hover:scale-110 transition duration-500"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                        {/* ✅ REMOVED DUPLICATE TITLE FROM INSIDE IMAGE */}
+
+                        {/* ✅ NEW: LATEST EPISODE BADGE */}
+                        {getLatestEp(item) && (
+                          <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg">
+                            Ep {getLatestEp(item)}
+                          </div>
+                        )}
                       </div>
 
                       {viewMode === "list" ? (
@@ -244,7 +251,7 @@ const ListingPage = ({ type }) => {
                         </div>
                       ) : (
                         <>
-                          <h3 className="font-bold truncate group-hover:text-red-400 transition">
+                          <h3 className="font-bold break-words group-hover:text-red-400 transition leading-tight">
                             {item.title}
                           </h3>
                           <p className="text-xs text-gray-400">
