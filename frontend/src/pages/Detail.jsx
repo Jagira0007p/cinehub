@@ -261,7 +261,7 @@ const Detail = () => {
                   onClick={() => setShowBatchModal(true)}
                   className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-red-600 to-orange-500 rounded-full font-bold shadow-lg hover:shadow-red-500/20 transition"
                 >
-                  <FolderDown size={18} /> Batch Download
+                  <FolderDown size={18} /> All Episodes
                 </button>
               </div>
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
@@ -430,7 +430,7 @@ const Detail = () => {
                 <X />
               </button>
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <FolderDown className="text-red-500" /> Batch Download
+                <FolderDown className="text-red-500" /> All Episodes
               </h3>
 
               {/* ✅ BATCH LINKS (Dynamic) */}
