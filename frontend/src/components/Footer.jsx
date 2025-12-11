@@ -1,8 +1,19 @@
-import { Heart, Code, Github, Twitter, Film } from "lucide-react";
+import { Heart, Code, Github, Twitter, Film, Send } from "lucide-react"; // Added 'Send' for Telegram
 import { motion } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const navigate = useNavigate();
+
+  // Function to handle genre click
+  const handleGenreClick = (genre) => {
+    // Redirect to search page with the selected genre
+    // Assuming you want to search both movies and series, but SearchPage usually handles one type at a time.
+    // Defaulting to 'movie' tab for genre search, user can switch tabs on SearchPage.
+    // Or you could make a specific route, but query params are standard.
+    navigate(`/search?genre=${genre}`);
+  };
 
   return (
     <footer className="bg-gray-900/50 border-t border-gray-800 mt-20">
@@ -37,19 +48,19 @@ const Footer = () => {
             <ul className="space-y-2">
               {["Movies", "Series"].map((item) => (
                 <li key={item}>
-                  <a
-                    href={`/${item.toLowerCase()}`}
+                  <Link
+                    to={`/${item.toLowerCase()}`}
                     className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 group"
                   >
                     <div className="w-1 h-1 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition" />
                     {item}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
           </motion.div>
 
-          {/* Genres */}
+          {/* Genres (Functional) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -60,12 +71,13 @@ const Footer = () => {
             <div className="flex flex-wrap gap-2">
               {["Action", "Drama", "Comedy", "Horror", "Sci-Fi", "Romance"].map(
                 (genre) => (
-                  <span
+                  <button
                     key={genre}
-                    className="px-3 py-1 bg-gray-800 rounded-full text-xs hover:bg-red-600 transition cursor-pointer"
+                    onClick={() => handleGenreClick(genre)}
+                    className="px-3 py-1 bg-gray-800 rounded-full text-xs hover:bg-red-600 transition cursor-pointer text-gray-300 hover:text-white border border-gray-700 hover:border-red-500"
                   >
                     {genre}
-                  </span>
+                  </button>
                 )
               )}
             </div>
@@ -80,17 +92,37 @@ const Footer = () => {
           >
             <h3 className="text-lg font-bold">Connect</h3>
             <div className="flex gap-4">
-              {[Github, Twitter].map((Icon, index) => (
-                <motion.a
-                  key={index}
-                  whileHover={{ scale: 1.1, y: -3 }}
-                  whileTap={{ scale: 0.9 }}
-                  href="#"
-                  className="p-2 bg-gray-800 rounded-lg hover:bg-red-600 transition"
-                >
-                  <Icon className="w-5 h-5" />
-                </motion.a>
-              ))}
+              {/* Telegram */}
+              <motion.a
+                whileHover={{ scale: 1.1, y: -3 }}
+                whileTap={{ scale: 0.9 }}
+                href="https://t.me/YOUR_TELEGRAM_GROUP_LINK" // Replace with your actual Telegram link
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-gray-800 rounded-lg hover:bg-blue-500 transition text-white"
+              >
+                <Send className="w-5 h-5" />
+              </motion.a>
+
+              {/* Github (Keep existing or remove if not needed) */}
+              <motion.a
+                whileHover={{ scale: 1.1, y: -3 }}
+                whileTap={{ scale: 0.9 }}
+                href="#"
+                className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition text-white"
+              >
+                <Github className="w-5 h-5" />
+              </motion.a>
+
+              {/* Twitter */}
+              <motion.a
+                whileHover={{ scale: 1.1, y: -3 }}
+                whileTap={{ scale: 0.9 }}
+                href="#"
+                className="p-2 bg-gray-800 rounded-lg hover:bg-blue-400 transition text-white"
+              >
+                <Twitter className="w-5 h-5" />
+              </motion.a>
             </div>
             <p className="text-gray-400 text-sm">
               Made with <Heart className="inline w-4 h-4 text-red-500" /> by the

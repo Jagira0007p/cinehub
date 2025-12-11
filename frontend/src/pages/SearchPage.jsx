@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  const genreQuery = searchParams.get("genre") || ""; // Reads genre from URL
 
   // State for Tabs & Pagination
   const [activeTab, setActiveTab] = useState("movie"); // 'movie' or 'series'
@@ -22,10 +23,15 @@ const SearchPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  // ✅ Scroll to top whenever page or tab changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page, activeTab]);
+
   // Reset page when tab or query changes
   useEffect(() => {
     setPage(1);
-  }, [activeTab, query]);
+  }, [activeTab, query, genreQuery]);
 
   // Fetch Data whenever dependencies change
   useEffect(() => {
@@ -34,7 +40,7 @@ const SearchPage = () => {
       try {
         // Calls the existing endpoint: /api/list/movie?search=...&page=...
         const res = await api.get(
-          `/list/${activeTab}?search=${query}&page=${page}`
+          `/list/${activeTab}?search=${query}&genre=${genreQuery}&page=${page}`
         );
         setItems(res.data.items);
         setTotalPages(res.data.totalPages);
@@ -45,10 +51,11 @@ const SearchPage = () => {
       }
     };
 
-    if (query) {
+    // Fetch if there is a query OR a genre
+    if (query || genreQuery) {
       fetchData();
     }
-  }, [activeTab, query, page]);
+  }, [activeTab, query, genreQuery, page]);
 
   // Helper for Genres
   const formatGenre = (genre) =>
@@ -63,7 +70,16 @@ const SearchPage = () => {
         className="mb-8"
       >
         <h1 className="text-3xl font-bold mb-2">
-          Search Results for: <span className="text-red-500">"{query}"</span>
+          {genreQuery ? (
+            <>
+              Genre: <span className="text-red-500">{genreQuery}</span>
+            </>
+          ) : (
+            <>
+              Search Results for:{" "}
+              <span className="text-red-500">"{query}"</span>
+            </>
+          )}
         </h1>
         <p className="text-gray-400">Found results in the library</p>
       </motion.div>
@@ -142,7 +158,7 @@ const SearchPage = () => {
                       </div>
                     </div>
                     <div className="p-3">
-                      {/* ✅ FIXED: Removed truncate, added break-words */}
+                      {/* ✅ FIXED: Removed truncate, added break-words for full title */}
                       <h3 className="font-semibold break-words text-white group-hover:text-red-400 transition leading-tight">
                         {item.title}
                       </h3>
