@@ -19,6 +19,7 @@ const ListingPage = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState("grid");
   const [showFilters, setShowFilters] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
@@ -29,6 +30,11 @@ const ListingPage = ({ type }) => {
 
   const debouncedSearch = useDebounce(searchTerm, 500);
   const title = type === "movie" ? "Movies" : "Series";
+
+  // ✅ NEW: Scroll to Top whenever Page or Type changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page, type]);
 
   useEffect(() => {
     const loadFilters = async () => {
@@ -64,6 +70,7 @@ const ListingPage = ({ type }) => {
     fetchData();
   }, [type, page, debouncedSearch, selectedGenre, selectedYear]);
 
+  // Handlers
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
     setPage(1);
@@ -82,6 +89,8 @@ const ListingPage = ({ type }) => {
     setSelectedYear("");
     setPage(1);
   };
+
+  // Helper to join genres
   const formatGenre = (genre) =>
     Array.isArray(genre) ? genre.join(", ") : genre;
 
@@ -229,7 +238,7 @@ const ListingPage = ({ type }) => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                        {/* ✅ NEW: LATEST EPISODE BADGE */}
+                        {/* ✅ LATEST EPISODE BADGE */}
                         {getLatestEp(item) && (
                           <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg">
                             Ep {getLatestEp(item)}
