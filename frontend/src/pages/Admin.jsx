@@ -594,6 +594,8 @@ const EpisodeManager = () => {
   const [editingEpId, setEditingEpId] = useState(null);
   const initialForm = { title: "", episodeNumber: "", downloadLinks: [] };
   const [epForm, setEpForm] = useState(initialForm);
+  // ✅ NEW: Search State
+  const [seriesSearch, setSeriesSearch] = useState("");
 
   useEffect(() => {
     api.get("/content").then((res) => setSeriesList(res.data.series));
@@ -673,22 +675,40 @@ const EpisodeManager = () => {
     }
   };
 
+  // ✅ NEW: Filtered Series Logic
+  const filteredSeries = seriesList.filter((s) =>
+    s.title.toLowerCase().includes(seriesSearch.toLowerCase())
+  );
+
   return (
     <div className="glass-effect p-6 rounded-2xl max-w-5xl mx-auto">
       <h2 className="text-xl font-bold mb-6">Manage Episodes</h2>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         <div className="md:col-span-5">
+          {/* ✅ NEW: Series Search Input */}
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              className="w-full pl-10 p-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white outline-none focus:border-blue-500 transition"
+              placeholder="Search Series..."
+              value={seriesSearch}
+              onChange={(e) => setSeriesSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Modified Select to use filteredSeries */}
           <select
             className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white mb-6"
             onChange={handleSeriesSelect}
           >
             <option value="">-- Select Series --</option>
-            {seriesList.map((s) => (
+            {filteredSeries.map((s) => (
               <option key={s._id} value={s._id}>
                 {s.title}
               </option>
             ))}
           </select>
+
           {selectedSeries && (
             <div className="space-y-4">
               <div className="flex justify-between">
