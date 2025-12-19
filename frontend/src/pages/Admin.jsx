@@ -193,7 +193,6 @@ const Admin = () => {
           {[
             { id: "content", label: "Movies/Series", icon: Film },
             { id: "episodes", label: "Episodes", icon: Tv },
-            // ✅ NEW SETTINGS TAB
             { id: "settings", label: "Site Settings", icon: SettingsIcon },
           ].map((tab) => (
             <button
@@ -219,7 +218,6 @@ const Admin = () => {
           >
             {activeTab === "content" && <ContentManager />}
             {activeTab === "episodes" && <EpisodeManager />}
-            {/* ✅ NEW SETTINGS RENDER */}
             {activeTab === "settings" && <SettingsManager />}
           </motion.div>
         </AnimatePresence>
@@ -228,7 +226,7 @@ const Admin = () => {
   );
 };
 
-// ✅ NEW: SETTINGS MANAGER COMPONENT
+// --- SETTINGS MANAGER COMPONENT ---
 const SettingsManager = () => {
   const [settings, setSettings] = useState({
     activeDomain: "",
@@ -271,7 +269,7 @@ const SettingsManager = () => {
             {/* 1. ACTIVE DOMAIN */}
             <div>
               <label className="text-xs text-gray-400 uppercase font-bold">
-                Active Frontend Domain (User Visible)
+                Active Frontend Domain (Where users watch)
               </label>
               <input
                 className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-blue-500 outline-none text-white mt-1"
@@ -282,8 +280,8 @@ const SettingsManager = () => {
                 }
               />
               <p className="text-xs text-gray-500 mt-1">
-                If your domain gets banned, change this to your new domain. Old
-                links will automatically redirect here.
+                This is your actual website. If it gets banned, update this
+                field to your new domain (e.g. dvstream-new.in).
               </p>
             </div>
 
@@ -294,15 +292,16 @@ const SettingsManager = () => {
               </label>
               <input
                 className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-green-500 outline-none text-white mt-1"
-                placeholder="https://dvstream-project.vercel.app"
+                placeholder="https://cinehub-99d2.onrender.com"
                 value={settings.stableUrl}
                 onChange={(e) =>
                   setSettings({ ...settings, stableUrl: e.target.value })
                 }
               />
               <p className="text-xs text-gray-500 mt-1">
-                This is the link posted to Telegram. Use your permanent Vercel
-                Project URL (e.g. your-project.vercel.app).
+                Enter your Render URL here:{" "}
+                <b>https://cinehub-99d2.onrender.com</b>. This link is what gets
+                posted to Telegram.
               </p>
             </div>
           </div>
@@ -394,7 +393,7 @@ const ContentManager = () => {
       .map(([key, url]) => ({
         quality: key.replace("p", "") + "p",
         size: "N/A",
-        url: url,
+        url,
       }));
   };
 
@@ -403,21 +402,18 @@ const ContentManager = () => {
     const genreString = Array.isArray(item.genre)
       ? item.genre.join(", ")
       : item.genre;
-
     let dLinks = item.downloadLinks || [];
     if (dLinks.length === 0 && item.downloads)
       dLinks = convertOldLinks(item.downloads);
-
     let bLinks = item.batchDownloadLinks || [];
     if (
       bLinks.length === 0 &&
       item.batchLinks &&
       !Array.isArray(item.batchLinks)
-    ) {
+    )
       bLinks = convertOldLinks(item.batchLinks);
-    } else if (item.batchLinks && Array.isArray(item.batchLinks)) {
+    else if (item.batchLinks && Array.isArray(item.batchLinks))
       bLinks = item.batchLinks;
-    }
 
     setFormData({
       ...item,
@@ -579,7 +575,6 @@ const ContentManager = () => {
                 }
               />
             </div>
-
             <div className="border-t border-gray-700 pt-4 space-y-4">
               <div>
                 <p className="text-xs font-bold mb-1">Poster</p>
@@ -632,8 +627,6 @@ const ContentManager = () => {
                 </div>
               </div>
             </div>
-
-            {/* DYNAMIC LINKS */}
             {formData.type === "movie" && (
               <div className="border-t border-gray-700 mt-2">
                 <DynamicLinks
@@ -656,7 +649,6 @@ const ContentManager = () => {
                 />
               </div>
             )}
-
             <button
               disabled={uploading}
               className="w-full bg-green-600 py-3 rounded-xl font-bold"
@@ -666,8 +658,6 @@ const ContentManager = () => {
           </form>
         </div>
       </div>
-
-      {/* List Section */}
       <div className="lg:col-span-2">
         <div className="glass-effect p-6 rounded-2xl">
           <div className="flex justify-between mb-4">
@@ -719,7 +709,7 @@ const ContentManager = () => {
   );
 };
 
-// --- EPISODE MANAGER (UNCHANGED BUT INCLUDED) ---
+// --- EPISODE MANAGER (UNCHANGED) ---
 const EpisodeManager = () => {
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeries, setSelectedSeries] = useState(null);
@@ -747,7 +737,7 @@ const EpisodeManager = () => {
   const handleEditEp = (ep) => {
     setEditingEpId(ep._id);
     let links = ep.downloadLinks || [];
-    if (links.length === 0 && ep.downloads) {
+    if (links.length === 0 && ep.downloads)
       links = Object.entries(ep.downloads)
         .filter(([_, url]) => url)
         .map(([key, url]) => ({
@@ -755,7 +745,6 @@ const EpisodeManager = () => {
           size: "N/A",
           url,
         }));
-    }
     setEpForm({
       title: ep.title,
       episodeNumber: ep.episodeNumber,
@@ -825,7 +814,6 @@ const EpisodeManager = () => {
               onChange={(e) => setSeriesSearch(e.target.value)}
             />
           </div>
-
           <select
             className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white mb-6"
             onChange={handleSeriesSelect}
@@ -837,7 +825,6 @@ const EpisodeManager = () => {
               </option>
             ))}
           </select>
-
           {selectedSeries && (
             <div className="space-y-4">
               <div className="flex justify-between">
@@ -876,7 +863,6 @@ const EpisodeManager = () => {
                   }
                   required
                 />
-
                 <div className="border-t border-gray-700 pt-2">
                   <DynamicLinks
                     label="Episode Links"

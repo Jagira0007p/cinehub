@@ -12,13 +12,14 @@ const axios = require("axios"); // ✅ REQUIRED FOR TELEGRAM
 const Movie = require("./models/Movie");
 const Series = require("./models/Series");
 
-// ✅ SETTINGS SCHEMA (Inlined for safety)
+// ✅ SETTINGS SCHEMA (Inlined for simplicity)
 const settingsSchema = new mongoose.Schema({
-  activeDomain: { type: String, default: "https://dvstream.vercel.app" }, // Where users go
-  stableUrl: { type: String, default: "" }, // Your Vercel Backend URL (The "Forever" Link)
+  activeDomain: { type: String, default: "https://dvstream.vercel.app" }, // Your Frontend
+  stableUrl: { type: String, default: "https://cinehub-99d2.onrender.com" }, // Your Render Backend
   telegramChatId: { type: String, default: "" },
   telegramBotToken: { type: String, default: "" },
 });
+// Use existing model if defined to prevent OverwriteModelError
 const Settings =
   mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
@@ -53,8 +54,8 @@ const processGenre = (genreInput) => {
   return genreInput.split(",").map((g) => g.trim());
 };
 
-// --- TELEGRAM AUTOMATION ---
-const sendTelegramPost = async (item, type) => {
+// --- TELEGRAM AUTOMATION LOGIC ---
+const sendTelegramPost = async (item, type, customMessage = "") => {
   try {
     const settings = await Settings.findOne();
 
@@ -63,23 +64,20 @@ const sendTelegramPost = async (item, type) => {
       return;
     }
 
-    // ✅ USE STABLE URL (Fallback to active if missing)
-    // This creates the "Forever Link"
-    const baseUrl =
-      settings.stableUrl ||
-      settings.activeDomain ||
-      "https://dvstream.vercel.app";
+    // ✅ USE RENDER URL (This is the "Forever Link")
+    const baseUrl = settings.stableUrl || "https://cinehub-99d2.onrender.com";
     const cleanBaseUrl = baseUrl.replace(/\/$/, "");
     const redirectLink = `${cleanBaseUrl}/go/${type}/${item._id}`;
 
     const caption = `
+${customMessage ? `🔔 <b>${customMessage}</b>\n` : ""}
 🎬 <b>${item.title} (${item.year})</b>
 ✨ <i>${item.genre.join(", ")}</i>
 
 ${item.description ? item.description.substring(0, 150) + "..." : ""}
 
 🔥 <b>Quality:</b> 480p, 720p, 1080p
-🚀 <b>Audio:</b> Dual Audio [Hin-Eng]
+🚀 <b>Audio:</b> Dual Audio [Hin-Eng], Hindi
 
 👇 <b>Download & Watch Here:</b>
 ${redirectLink}
@@ -87,6 +85,7 @@ ${redirectLink}
 📢 <i>Join Channel for more!</i>
 `;
 
+    // Send Photo to Telegram
     await axios.post(
       `https://api.telegram.org/bot${settings.telegramBotToken}/sendPhoto`,
       {
@@ -107,18 +106,18 @@ ${redirectLink}
 
 // --- ROUTES ---
 
-// ✅ 1. THE "FOREVER" REDIRECTOR
-// Users click this link in Telegram -> Redirects to Current Active Domain
+// ✅ 1. THE "FOREVER" REDIRECTOR (This runs on Render)
 app.get("/go/:type/:id", async (req, res) => {
   try {
     const settings = await Settings.findOne();
+    // Default to a safe fallback if DB is empty
     const activeDomain =
       settings?.activeDomain || "https://dvstream.vercel.app";
 
     // Clean domain string
     const targetDomain = activeDomain.replace(/\/$/, "");
 
-    // Perform Redirect
+    // Perform Redirect to the CURRENT working domain
     res.redirect(`${targetDomain}/${req.params.type}/${req.params.id}`);
   } catch (err) {
     res.status(500).send("Redirect Error");
@@ -148,7 +147,7 @@ app.put("/api/settings", verifyAdmin, async (req, res) => {
   }
 });
 
-// --- EXISTING ROUTES ---
+// --- EXISTING CONTENT ROUTES ---
 
 app.get("/api/home", async (req, res) => {
   try {
@@ -295,8 +294,8 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
     const newItem = new Model(data);
     await newItem.save();
 
-    // 🚀 Auto-Post to Telegram with Redirect Link
-    sendTelegramPost(newItem, type);
+    // 🚀 Send to Telegram
+    await sendTelegramPost(newItem, type, "🆕 New Upload!");
 
     res.json(newItem);
   } catch (err) {
@@ -304,13 +303,17 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   }
 });
 
-// UPDATE Content
+// ✅ UPDATE Content + TRIGGER TELEGRAM
 app.put("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   try {
     const { type, id } = req.params;
     const Model = type === "movie" ? Movie : Series;
     const data = { ...req.body, genre: processGenre(req.body.genre) };
     const updatedItem = await Model.findByIdAndUpdate(id, data, { new: true });
+
+    // 🚀 Send Update to Telegram
+    await sendTelegramPost(updatedItem, type, "🔄 Updated Quality/Links!");
+
     res.json(updatedItem);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -328,7 +331,7 @@ app.delete("/api/content/:type/:id", verifyAdmin, async (req, res) => {
   }
 });
 
-// Episode Routes
+// ✅ ADD Episode + TRIGGER TELEGRAM
 app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -338,12 +341,17 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
     series.episodes.push(req.body);
     series.markModified("episodes");
     await series.save();
+
+    // 🚀 Send Episode Notification
+    await sendTelegramPost(series, "series", "🔥 New Episode Added!");
+
     res.json(series);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ✅ UPDATE Episode + TRIGGER TELEGRAM
 app.put(
   "/api/content/series/:seriesId/episode/:episodeId",
   verifyAdmin,
@@ -361,6 +369,10 @@ app.put(
 
       series.markModified("episodes");
       await series.save();
+
+      // 🚀 Send Episode Update
+      await sendTelegramPost(series, "series", "⚡ Episode Updated!");
+
       res.json(series);
     } catch (err) {
       res.status(500).json({ error: err.message });
