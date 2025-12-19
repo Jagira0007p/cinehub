@@ -13,8 +13,8 @@ import {
   Search,
   Loader2,
   Plus,
-  Settings as SettingsIcon, // ✅ NEW
-  Link as LinkIcon, // ✅ NEW
+  Settings as SettingsIcon,
+  Link as LinkIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
@@ -187,6 +187,8 @@ const Admin = () => {
             <Shield className="w-4 h-4" /> Logout
           </button>
         </div>
+
+        {/* TABS */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
             { id: "content", label: "Movies/Series", icon: Film },
@@ -207,6 +209,7 @@ const Admin = () => {
             </button>
           ))}
         </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -229,6 +232,7 @@ const Admin = () => {
 const SettingsManager = () => {
   const [settings, setSettings] = useState({
     activeDomain: "",
+    stableUrl: "",
     telegramBotToken: "",
     telegramChatId: "",
   });
@@ -263,22 +267,44 @@ const SettingsManager = () => {
           <h3 className="text-lg font-bold mb-4 text-blue-400 flex items-center gap-2">
             <LinkIcon size={18} /> Domain Safety System
           </h3>
-          <div className="space-y-2">
-            <label className="text-xs text-gray-400 uppercase font-bold">
-              Active Website URL
-            </label>
-            <input
-              className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-blue-500 outline-none text-white"
-              placeholder="https://dvstream.in"
-              value={settings.activeDomain}
-              onChange={(e) =>
-                setSettings({ ...settings, activeDomain: e.target.value })
-              }
-            />
-            <p className="text-xs text-gray-500">
-              Change this URL here if your domain gets banned. All previous
-              Telegram posts will automatically redirect to this new URL.
-            </p>
+          <div className="space-y-4">
+            {/* 1. ACTIVE DOMAIN */}
+            <div>
+              <label className="text-xs text-gray-400 uppercase font-bold">
+                Active Frontend Domain (User Visible)
+              </label>
+              <input
+                className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-blue-500 outline-none text-white mt-1"
+                placeholder="https://dvstream.in"
+                value={settings.activeDomain}
+                onChange={(e) =>
+                  setSettings({ ...settings, activeDomain: e.target.value })
+                }
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                If your domain gets banned, change this to your new domain. Old
+                links will automatically redirect here.
+              </p>
+            </div>
+
+            {/* 2. STABLE BACKEND URL */}
+            <div>
+              <label className="text-xs text-gray-400 uppercase font-bold">
+                Stable Backend URL (The Forever Link)
+              </label>
+              <input
+                className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-green-500 outline-none text-white mt-1"
+                placeholder="https://dvstream-project.vercel.app"
+                value={settings.stableUrl}
+                onChange={(e) =>
+                  setSettings({ ...settings, stableUrl: e.target.value })
+                }
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This is the link posted to Telegram. Use your permanent Vercel
+                Project URL (e.g. your-project.vercel.app).
+              </p>
+            </div>
           </div>
         </div>
 
@@ -328,7 +354,7 @@ const SettingsManager = () => {
   );
 };
 
-// --- CONTENT MANAGER ---
+// --- CONTENT MANAGER (UNCHANGED) ---
 const ContentManager = () => {
   const [items, setItems] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -693,7 +719,7 @@ const ContentManager = () => {
   );
 };
 
-// --- EPISODE MANAGER ---
+// --- EPISODE MANAGER (UNCHANGED BUT INCLUDED) ---
 const EpisodeManager = () => {
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeries, setSelectedSeries] = useState(null);

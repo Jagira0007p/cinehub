@@ -5,12 +5,22 @@ const connectDB = require("./config/db");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const streamifier = require("streamifier");
-const axios = require("axios"); // ✅ NEW: For Telegram API
+const mongoose = require("mongoose");
+const axios = require("axios"); // ✅ REQUIRED FOR TELEGRAM
 
-// Models
+// --- MODELS ---
 const Movie = require("./models/Movie");
 const Series = require("./models/Series");
-const Settings = require("./models/Settings"); // ✅ NEW
+
+// ✅ SETTINGS SCHEMA (Inlined for safety)
+const settingsSchema = new mongoose.Schema({
+  activeDomain: { type: String, default: "https://dvstream.vercel.app" }, // Where users go
+  stableUrl: { type: String, default: "" }, // Your Vercel Backend URL (The "Forever" Link)
+  telegramChatId: { type: String, default: "" },
+  telegramBotToken: { type: String, default: "" },
+});
+const Settings =
+  mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
 const app = express();
 
@@ -43,24 +53,24 @@ const processGenre = (genreInput) => {
   return genreInput.split(",").map((g) => g.trim());
 };
 
-// --- TELEGRAM AUTOMATION HELPER ---
+// --- TELEGRAM AUTOMATION ---
 const sendTelegramPost = async (item, type) => {
   try {
     const settings = await Settings.findOne();
+
     if (!settings || !settings.telegramBotToken || !settings.telegramChatId) {
-      console.log("Telegram settings missing. Skipping post.");
+      console.log("⚠️ Telegram Settings Missing. Skipping Auto-Post.");
       return;
     }
 
-    // This URL should point to your BACKEND (API) Vercel URL
-    // e.g. https://dvstream-api.vercel.app
-    // Since we are running inside the server, we might need a hardcoded base URL
-    // or rely on the frontend one. For simplicity, assume the API URL is known or use a placeholder.
-    // Ideally, store "Backend URL" in Settings too, or hardcode your Vercel API URL here.
-    const BACKEND_URL = "https://dvstream-api.vercel.app"; // ⚠️ REPLACE THIS WITH YOUR REAL BACKEND URL
-
-    // The Redirect Link
-    const redirectLink = `${BACKEND_URL}/go/${type}/${item._id}`;
+    // ✅ USE STABLE URL (Fallback to active if missing)
+    // This creates the "Forever Link"
+    const baseUrl =
+      settings.stableUrl ||
+      settings.activeDomain ||
+      "https://dvstream.vercel.app";
+    const cleanBaseUrl = baseUrl.replace(/\/$/, "");
+    const redirectLink = `${cleanBaseUrl}/go/${type}/${item._id}`;
 
     const caption = `
 🎬 <b>${item.title} (${item.year})</b>
@@ -77,7 +87,6 @@ ${redirectLink}
 📢 <i>Join Channel for more!</i>
 `;
 
-    // Send Photo
     await axios.post(
       `https://api.telegram.org/bot${settings.telegramBotToken}/sendPhoto`,
       {
@@ -90,28 +99,33 @@ ${redirectLink}
         },
       }
     );
-    console.log("Telegram Post Sent Successfully!");
+    console.log("✅ Telegram Post Sent!");
   } catch (error) {
-    console.error("Telegram Error:", error.message);
+    console.error("❌ Telegram Error:", error.message);
   }
 };
 
 // --- ROUTES ---
 
 // ✅ 1. THE "FOREVER" REDIRECTOR
+// Users click this link in Telegram -> Redirects to Current Active Domain
 app.get("/go/:type/:id", async (req, res) => {
   try {
     const settings = await Settings.findOne();
     const activeDomain =
       settings?.activeDomain || "https://dvstream.vercel.app";
-    // Redirect user to the CURRENT working domain + correct path
-    res.redirect(`${activeDomain}/${req.params.type}/${req.params.id}`);
+
+    // Clean domain string
+    const targetDomain = activeDomain.replace(/\/$/, "");
+
+    // Perform Redirect
+    res.redirect(`${targetDomain}/${req.params.type}/${req.params.id}`);
   } catch (err) {
     res.status(500).send("Redirect Error");
   }
 });
 
-// ✅ 2. SETTINGS ROUTES (Admin)
+// ✅ 2. SETTINGS ROUTES
 app.get("/api/settings", async (req, res) => {
   try {
     let settings = await Settings.findOne();
@@ -134,7 +148,7 @@ app.put("/api/settings", verifyAdmin, async (req, res) => {
   }
 });
 
-// --- EXISTING ROUTES (PRESERVED) ---
+// --- EXISTING ROUTES ---
 
 app.get("/api/home", async (req, res) => {
   try {
@@ -269,7 +283,7 @@ app.delete("/api/upload", verifyAdmin, async (req, res) => {
   }
 });
 
-// ✅ CREATE Content + TRIGGER AUTOMATION
+// ✅ CREATE Content + TRIGGER TELEGRAM
 app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   try {
     const { type } = req.params;
@@ -281,7 +295,7 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
     const newItem = new Model(data);
     await newItem.save();
 
-    // 🚀 Fire and forget Telegram post
+    // 🚀 Auto-Post to Telegram with Redirect Link
     sendTelegramPost(newItem, type);
 
     res.json(newItem);
