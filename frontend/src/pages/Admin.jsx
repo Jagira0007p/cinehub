@@ -13,6 +13,8 @@ import {
   Search,
   Loader2,
   Plus,
+  Settings as SettingsIcon, // ✅ NEW
+  Link as LinkIcon, // ✅ NEW
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
@@ -187,8 +189,10 @@ const Admin = () => {
         </div>
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
           {[
-            { id: "content", label: "Manage Movies/Series", icon: Film },
-            { id: "episodes", label: "Manage Episodes", icon: Tv },
+            { id: "content", label: "Movies/Series", icon: Film },
+            { id: "episodes", label: "Episodes", icon: Tv },
+            // ✅ NEW SETTINGS TAB
+            { id: "settings", label: "Site Settings", icon: SettingsIcon },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -210,10 +214,116 @@ const Admin = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
           >
-            {activeTab === "content" ? <ContentManager /> : <EpisodeManager />}
+            {activeTab === "content" && <ContentManager />}
+            {activeTab === "episodes" && <EpisodeManager />}
+            {/* ✅ NEW SETTINGS RENDER */}
+            {activeTab === "settings" && <SettingsManager />}
           </motion.div>
         </AnimatePresence>
       </div>
+    </div>
+  );
+};
+
+// ✅ NEW: SETTINGS MANAGER COMPONENT
+const SettingsManager = () => {
+  const [settings, setSettings] = useState({
+    activeDomain: "",
+    telegramBotToken: "",
+    telegramChatId: "",
+  });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings").then((res) => setSettings(res.data));
+  }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.put("/settings", settings, getAdminHeaders());
+      toast.success("Settings Saved!");
+    } catch (error) {
+      toast.error("Failed to save settings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="glass-effect p-8 rounded-2xl max-w-2xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <SettingsIcon className="text-red-500" /> Site Configuration
+      </h2>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* DOMAIN SETTINGS */}
+        <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold mb-4 text-blue-400 flex items-center gap-2">
+            <LinkIcon size={18} /> Domain Safety System
+          </h3>
+          <div className="space-y-2">
+            <label className="text-xs text-gray-400 uppercase font-bold">
+              Active Website URL
+            </label>
+            <input
+              className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl focus:border-blue-500 outline-none text-white"
+              placeholder="https://dvstream.in"
+              value={settings.activeDomain}
+              onChange={(e) =>
+                setSettings({ ...settings, activeDomain: e.target.value })
+              }
+            />
+            <p className="text-xs text-gray-500">
+              Change this URL here if your domain gets banned. All previous
+              Telegram posts will automatically redirect to this new URL.
+            </p>
+          </div>
+        </div>
+
+        {/* TELEGRAM AUTOMATION */}
+        <div className="bg-gray-800/50 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-lg font-bold mb-4 text-blue-400 flex items-center gap-2">
+            <SettingsIcon size={18} /> Telegram Auto-Post
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-400 uppercase font-bold">
+                Bot Token
+              </label>
+              <input
+                className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl text-white"
+                placeholder="600000:AAH..."
+                value={settings.telegramBotToken}
+                onChange={(e) =>
+                  setSettings({ ...settings, telegramBotToken: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase font-bold">
+                Channel ID
+              </label>
+              <input
+                className="w-full p-3 bg-gray-900 border border-gray-600 rounded-xl text-white"
+                placeholder="-100xxxxxxx"
+                value={settings.telegramChatId}
+                onChange={(e) =>
+                  setSettings({ ...settings, telegramChatId: e.target.value })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        <button
+          disabled={loading}
+          className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl font-bold text-lg shadow-lg hover:shadow-green-500/20 transition"
+        >
+          {loading ? "Saving..." : "Save Configuration"}
+        </button>
+      </form>
     </div>
   );
 };
@@ -232,7 +342,7 @@ const ContentManager = () => {
     year: new Date().getFullYear(),
     type: "movie",
     downloadLinks: [],
-    batchDownloadLinks: [], // Using new name matching Schema
+    batchDownloadLinks: [],
     poster: "",
     previewImages: [],
   };
@@ -251,7 +361,6 @@ const ContentManager = () => {
     fetchContent();
   }, []);
 
-  // Convert old object format to new array format if needed
   const convertOldLinks = (oldLinks) => {
     if (!oldLinks) return [];
     return Object.entries(oldLinks)
@@ -269,13 +378,11 @@ const ContentManager = () => {
       ? item.genre.join(", ")
       : item.genre;
 
-    // Auto-migrate on edit open
     let dLinks = item.downloadLinks || [];
     if (dLinks.length === 0 && item.downloads)
       dLinks = convertOldLinks(item.downloads);
 
     let bLinks = item.batchDownloadLinks || [];
-    // Check old batchLinks (which was object in Series schema previously)
     if (
       bLinks.length === 0 &&
       item.batchLinks &&
@@ -355,7 +462,7 @@ const ContentManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...formData }; // FormData already matches schema structure now
+    const payload = { ...formData };
     try {
       if (editingId)
         await api.put(
@@ -594,7 +701,6 @@ const EpisodeManager = () => {
   const [editingEpId, setEditingEpId] = useState(null);
   const initialForm = { title: "", episodeNumber: "", downloadLinks: [] };
   const [epForm, setEpForm] = useState(initialForm);
-  // ✅ NEW: Search State
   const [seriesSearch, setSeriesSearch] = useState("");
 
   useEffect(() => {
@@ -675,7 +781,6 @@ const EpisodeManager = () => {
     }
   };
 
-  // ✅ NEW: Filtered Series Logic
   const filteredSeries = seriesList.filter((s) =>
     s.title.toLowerCase().includes(seriesSearch.toLowerCase())
   );
@@ -685,7 +790,6 @@ const EpisodeManager = () => {
       <h2 className="text-xl font-bold mb-6">Manage Episodes</h2>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         <div className="md:col-span-5">
-          {/* ✅ NEW: Series Search Input */}
           <div className="relative mb-2">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
@@ -696,7 +800,6 @@ const EpisodeManager = () => {
             />
           </div>
 
-          {/* Modified Select to use filteredSeries */}
           <select
             className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white mb-6"
             onChange={handleSeriesSelect}

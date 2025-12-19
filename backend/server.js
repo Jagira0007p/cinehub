@@ -5,10 +5,12 @@ const connectDB = require("./config/db");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const streamifier = require("streamifier");
+const axios = require("axios"); // ✅ NEW: For Telegram API
 
 // Models
 const Movie = require("./models/Movie");
 const Series = require("./models/Series");
+const Settings = require("./models/Settings"); // ✅ NEW
 
 const app = express();
 
@@ -41,13 +43,102 @@ const processGenre = (genreInput) => {
   return genreInput.split(",").map((g) => g.trim());
 };
 
+// --- TELEGRAM AUTOMATION HELPER ---
+const sendTelegramPost = async (item, type) => {
+  try {
+    const settings = await Settings.findOne();
+    if (!settings || !settings.telegramBotToken || !settings.telegramChatId) {
+      console.log("Telegram settings missing. Skipping post.");
+      return;
+    }
+
+    // This URL should point to your BACKEND (API) Vercel URL
+    // e.g. https://dvstream-api.vercel.app
+    // Since we are running inside the server, we might need a hardcoded base URL
+    // or rely on the frontend one. For simplicity, assume the API URL is known or use a placeholder.
+    // Ideally, store "Backend URL" in Settings too, or hardcode your Vercel API URL here.
+    const BACKEND_URL = "https://dvstream-api.vercel.app"; // ⚠️ REPLACE THIS WITH YOUR REAL BACKEND URL
+
+    // The Redirect Link
+    const redirectLink = `${BACKEND_URL}/go/${type}/${item._id}`;
+
+    const caption = `
+🎬 <b>${item.title} (${item.year})</b>
+✨ <i>${item.genre.join(", ")}</i>
+
+${item.description ? item.description.substring(0, 150) + "..." : ""}
+
+🔥 <b>Quality:</b> 480p, 720p, 1080p
+🚀 <b>Audio:</b> Dual Audio [Hin-Eng]
+
+👇 <b>Download & Watch Here:</b>
+${redirectLink}
+
+📢 <i>Join Channel for more!</i>
+`;
+
+    // Send Photo
+    await axios.post(
+      `https://api.telegram.org/bot${settings.telegramBotToken}/sendPhoto`,
+      {
+        chat_id: settings.telegramChatId,
+        photo: item.poster,
+        caption: caption,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [[{ text: "📥 Download Now", url: redirectLink }]],
+        },
+      }
+    );
+    console.log("Telegram Post Sent Successfully!");
+  } catch (error) {
+    console.error("Telegram Error:", error.message);
+  }
+};
+
 // --- ROUTES ---
 
-// 1. Get Home Page Showcase (UPDATED SORTING)
+// ✅ 1. THE "FOREVER" REDIRECTOR
+app.get("/go/:type/:id", async (req, res) => {
+  try {
+    const settings = await Settings.findOne();
+    const activeDomain =
+      settings?.activeDomain || "https://dvstream.vercel.app";
+    // Redirect user to the CURRENT working domain + correct path
+    res.redirect(`${activeDomain}/${req.params.type}/${req.params.id}`);
+  } catch (err) {
+    res.status(500).send("Redirect Error");
+  }
+});
+
+// ✅ 2. SETTINGS ROUTES (Admin)
+app.get("/api/settings", async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+    if (!settings) settings = await Settings.create({});
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put("/api/settings", verifyAdmin, async (req, res) => {
+  try {
+    const settings = await Settings.findOneAndUpdate({}, req.body, {
+      new: true,
+      upsert: true,
+    });
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- EXISTING ROUTES (PRESERVED) ---
+
 app.get("/api/home", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 }).limit(6);
-    // ✅ CHANGED: Series now sorts by 'updatedAt' so new episodes bump to top
     const series = await Series.find().sort({ updatedAt: -1 }).limit(6);
     res.json({ movies, series });
   } catch (err) {
@@ -70,7 +161,6 @@ app.get("/api/filters/:type", async (req, res) => {
   }
 });
 
-// 2. Get List (UPDATED SORTING)
 app.get("/api/list/:type", async (req, res) => {
   try {
     const { type } = req.params;
@@ -84,8 +174,6 @@ app.get("/api/list/:type", async (req, res) => {
     if (year) query.year = year;
 
     const Model = type === "movie" ? Movie : Series;
-
-    // ✅ CHANGED: Logic to pick sort field
     const sortField = type === "series" ? { updatedAt: -1 } : { createdAt: -1 };
 
     const [items, total] = await Promise.all([
@@ -116,7 +204,7 @@ app.get("/api/content/:type/:id", async (req, res) => {
 app.get("/api/content", async (req, res) => {
   try {
     const movies = await Movie.find().sort({ createdAt: -1 });
-    const series = await Series.find().sort({ updatedAt: -1 }); // Admin also sees latest updated series
+    const series = await Series.find().sort({ updatedAt: -1 });
     res.json({ movies, series });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -181,7 +269,7 @@ app.delete("/api/upload", verifyAdmin, async (req, res) => {
   }
 });
 
-// CREATE Content
+// ✅ CREATE Content + TRIGGER AUTOMATION
 app.post("/api/content/:type", verifyAdmin, async (req, res) => {
   try {
     const { type } = req.params;
@@ -189,8 +277,13 @@ app.post("/api/content/:type", verifyAdmin, async (req, res) => {
     const data = { ...req.body, genre: processGenre(req.body.genre) };
     if (type === "series")
       data.batchDownloadLinks = req.body.batchDownloadLinks;
+
     const newItem = new Model(data);
     await newItem.save();
+
+    // 🚀 Fire and forget Telegram post
+    sendTelegramPost(newItem, type);
+
     res.json(newItem);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -229,7 +322,6 @@ app.put("/api/content/series/:id/episode", verifyAdmin, async (req, res) => {
     if (!series) return res.status(404).json({ error: "Series not found" });
 
     series.episodes.push(req.body);
-    // Force update of timestamp
     series.markModified("episodes");
     await series.save();
     res.json(series);
@@ -253,7 +345,6 @@ app.put(
       episode.episodeNumber = req.body.episodeNumber;
       episode.downloadLinks = req.body.downloadLinks;
 
-      // Force timestamp update
       series.markModified("episodes");
       await series.save();
       res.json(series);
