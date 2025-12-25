@@ -12,12 +12,13 @@ import {
   ExternalLink,
   Layers,
   Image as ImageIcon,
+  Unlock,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import AdBanner from "../components/AdBanner";
 
-// SMART LINKS (Direct Links)
 const MONETAG_LINK = "https://otieu.com/4/10286714";
 const ADSTERRA_LINK = "https://your-adsterra-link.com/direct";
 
@@ -25,9 +26,14 @@ const Detail = () => {
   const { type, id } = useParams();
   const [item, setItem] = useState(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
-
   const [selectedEpisode, setSelectedEpisode] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+
+  // ✅ NEW: Track which links are "Unlocked"
+  // Format: { "url_string": boolean }
+  const [unlockedLinks, setUnlockedLinks] = useState({});
 
   useEffect(() => {
     api.get(`/content/${type}/${id}`).then((res) => setItem(res.data));
@@ -52,7 +58,6 @@ const Detail = () => {
       try {
         await navigator.share({
           title: item?.title,
-          text: `Check out ${item?.title}`,
           url: window.location.href,
         });
       } catch (err) {}
@@ -62,27 +67,35 @@ const Detail = () => {
     }
   };
 
+  // ✅ SMART DOWNLOAD LOGIC (UNLOCK PATTERN)
   const handleSmartDownload = (e, fileLink) => {
     e.preventDefault();
-    const links = [MONETAG_LINK, ADSTERRA_LINK];
-    const randomAd = links[Math.floor(Math.random() * links.length)];
-    if (randomAd && randomAd.startsWith("http"))
-      window.open(randomAd, "_blank");
-    setTimeout(() => {
+
+    // Check if already unlocked
+    if (unlockedLinks[fileLink]) {
+      // 🟢 2nd Click: Open Real Movie Link
       window.location.href = fileLink;
-    }, 500);
+    } else {
+      // 🔴 1st Click: Open Ad & Unlock
+      const links = [MONETAG_LINK, ADSTERRA_LINK];
+      const randomAd = links[Math.floor(Math.random() * links.length)];
+
+      if (randomAd && randomAd.startsWith("http")) {
+        window.open(randomAd, "_blank"); // Open Ad in New Tab
+      }
+
+      // Mark as unlocked immediately
+      setUnlockedLinks((prev) => ({ ...prev, [fileLink]: true }));
+    }
   };
 
-  // ✅ HELPER: UNIFY OLD & NEW LINKS
   const getUnifiedLinks = (data, isEpisode = false) => {
     if (!data) return [];
-    // 1. Check New Array
     if (data.downloadLinks && data.downloadLinks.length > 0)
       return data.downloadLinks;
     if (data.batchDownloadLinks && data.batchDownloadLinks.length > 0)
       return data.batchDownloadLinks;
 
-    // 2. Fallback Old Object
     const oldSource = isEpisode
       ? data.downloads
       : data.batchLinks || data.downloads;
@@ -98,6 +111,17 @@ const Detail = () => {
     return [];
   };
 
+  const copyBatchLinks = () => {
+    if (!item?.episodes) return;
+    const links = item.episodes
+      .sort((a, b) => a.episodeNumber - b.episodeNumber)
+      .flatMap((ep) => getUnifiedLinks(ep, true).map((l) => l.url))
+      .join("\n");
+    navigator.clipboard.writeText(links);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const formatGenre = (genre) =>
     Array.isArray(genre) ? genre.join(", ") : genre;
 
@@ -111,7 +135,6 @@ const Detail = () => {
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-8">
-      {/* HERO BANNER */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -182,114 +205,72 @@ const Detail = () => {
             </p>
           </div>
 
-          {item.previewImages && item.previewImages.length > 0 && (
-            <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <ImageIcon className="text-blue-500" /> Screenshots
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {item.previewImages.map((img, index) => (
-                  <motion.div
-                    key={index}
-                    whileHover={{ scale: 1.02 }}
-                    className="rounded-xl overflow-hidden shadow-lg cursor-pointer border border-gray-700"
-                    onClick={() => setPreviewImage(img)}
-                  >
-                    <img
-                      src={img}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-48 object-cover hover:opacity-90 transition"
-                    />
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <AdBanner zoneId="YOUR_CLICKADU_MAIN_ZONE_ID" />
 
-          {/* MOVIE DOWNLOADS */}
+          {/* ✅ MOVIE DOWNLOADS WITH UNLOCK LOGIC */}
           {type === "movie" && movieLinks.length > 0 && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50">
               <h2 className="text-2xl font-bold mb-6">Download Links</h2>
               <div className="space-y-3">
-                {movieLinks.map((link, i) => (
-                  <a
-                    key={i}
-                    href={link.url}
-                    onClick={(e) => handleSmartDownload(e, link.url)}
-                    className="flex items-center justify-between p-4 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-red-500/5 transition cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Download size={20} className="text-red-500" />
-                      <span className="font-bold uppercase">
-                        {link.quality}
-                      </span>
-                      {link.size && link.size !== "N/A" && (
-                        <span className="text-xs bg-gray-700 px-2 py-0.5 rounded text-gray-300">
-                          {link.size}
+                {movieLinks.map((link, i) => {
+                  const isUnlocked = unlockedLinks[link.url];
+                  return (
+                    <a
+                      key={i}
+                      href={link.url}
+                      onClick={(e) => handleSmartDownload(e, link.url)}
+                      className={`flex items-center justify-between p-4 rounded-xl border transition cursor-pointer ${
+                        isUnlocked
+                          ? "bg-green-600/10 border-green-500 hover:bg-green-600/20"
+                          : "bg-gray-800/50 border-gray-700 hover:border-red-500 hover:bg-red-500/5"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isUnlocked ? (
+                          <Unlock size={20} className="text-green-500" />
+                        ) : (
+                          <Download size={20} className="text-red-500" />
+                        )}
+                        <span className="font-bold uppercase">
+                          {link.quality}
                         </span>
-                      )}
-                    </div>
-                    <span className="text-xs bg-gray-800 px-3 py-1 rounded-full">
-                      Fast Download
-                    </span>
-                  </a>
-                ))}
+                        {link.size && link.size !== "N/A" && (
+                          <span className="text-xs bg-gray-700 px-2 py-0.5 rounded text-gray-300">
+                            {link.size}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs px-3 py-1 rounded-full font-bold ${
+                          isUnlocked
+                            ? "bg-green-500 text-black"
+                            : "bg-gray-800 text-white"
+                        }`}
+                      >
+                        {isUnlocked ? "Click to Download" : "Unlock Link"}
+                      </span>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* SERIES EPISODES & BATCH LINKS */}
+          {/* SERIES EPISODES */}
           {type === "series" && item.episodes && (
             <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-4">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <h3 className="text-xl font-bold flex items-center gap-2">
                   <Layers className="text-red-500" /> Episodes (
                   {item.episodes.length})
                 </h3>
-
-                {/* ✅ NEW: DISPLAY BATCH LINKS DIRECTLY HERE */}
-                {batchLinks.length > 0 && (
-                  <div className="mb-8 space-y-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FolderDown className="text-green-500" size={18} />
-                      <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">
-                        Season Packs (Zip Files)
-                      </span>
-                    </div>
-                    {batchLinks.map((link, i) => (
-                      <a
-                        key={i}
-                        href={link.url}
-                        onClick={(e) => handleSmartDownload(e, link.url)}
-                        className="flex items-center justify-between p-4 rounded-xl border border-green-500/30 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500 transition cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-500/20 rounded-full text-green-400 group-hover:scale-110 transition">
-                            <FolderDown size={20} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-white uppercase">
-                              {link.quality} Pack
-                            </span>
-                            {link.size && link.size !== "N/A" && (
-                              <span className="text-xs text-gray-400">
-                                {link.size} • Complete Season
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="text-xs font-bold bg-green-500/20 text-green-400 px-3 py-1 rounded-full border border-green-500/20 group-hover:bg-green-500 group-hover:text-black transition">
-                          Download Zip
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                )}
+                <button
+                  onClick={() => setShowBatchModal(true)}
+                  className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-red-600 to-orange-500 rounded-full font-bold shadow-lg hover:shadow-red-500/20 transition"
+                >
+                  <FolderDown size={18} /> All Episodes
+                </button>
               </div>
-
-              {/* EPISODE LIST */}
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {item.episodes
                   ?.sort((a, b) => a.episodeNumber - b.episodeNumber)
@@ -326,6 +307,7 @@ const Detail = () => {
           )}
         </div>
 
+        {/* Sidebar */}
         <div className="space-y-6">
           <div className="bg-gray-800/30 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50">
             <h3 className="text-xl font-bold mb-4">Details</h3>
@@ -350,30 +332,7 @@ const Detail = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {previewImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4"
-            onClick={() => setPreviewImage(null)}
-          >
-            <button
-              onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 text-white hover:text-red-500 transition"
-            >
-              <X size={32} />
-            </button>
-            <img
-              src={previewImage}
-              alt="Full Preview"
-              className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      {/* EPISODE MODAL WITH UNLOCK */}
       <AnimatePresence>
         {selectedEpisode && (
           <motion.div
@@ -401,34 +360,126 @@ const Detail = () => {
               </h3>
               <p className="text-gray-400 mb-6">{selectedEpisode.title}</p>
               <div className="space-y-3">
-                {/* EPISODE LINKS (Dynamic) */}
                 {getUnifiedLinks(selectedEpisode, true).length > 0 ? (
-                  getUnifiedLinks(selectedEpisode, true).map((link, i) => (
-                    <a
-                      key={i}
-                      href={link.url}
-                      onClick={(e) => handleSmartDownload(e, link.url)}
-                      className="flex items-center justify-between p-4 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-red-500 transition group cursor-pointer"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-bold text-lg uppercase">
-                          {link.quality}
-                        </span>
-                        {link.size !== "N/A" && (
-                          <span className="text-xs text-gray-400">
-                            {link.size}
+                  getUnifiedLinks(selectedEpisode, true).map((link, i) => {
+                    const isUnlocked = unlockedLinks[link.url];
+                    return (
+                      <a
+                        key={i}
+                        href={link.url}
+                        onClick={(e) => handleSmartDownload(e, link.url)}
+                        className={`flex items-center justify-between p-4 rounded-xl border transition group cursor-pointer ${
+                          isUnlocked
+                            ? "bg-green-900/20 border-green-500 hover:bg-green-900/40"
+                            : "bg-gray-800 hover:bg-gray-700 border-gray-700 hover:border-red-500"
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-bold text-lg uppercase">
+                            {link.quality}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white">
-                        Download <Download size={16} />
-                      </div>
-                    </a>
-                  ))
+                          {link.size !== "N/A" && (
+                            <span className="text-xs text-gray-400">
+                              {link.size}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className={`flex items-center gap-2 text-sm font-bold ${
+                            isUnlocked
+                              ? "text-green-400"
+                              : "text-gray-400 group-hover:text-white"
+                          }`}
+                        >
+                          {isUnlocked ? "Download" : "Unlock"}{" "}
+                          {isUnlocked ? (
+                            <Download size={16} />
+                          ) : (
+                            <Unlock size={16} />
+                          )}
+                        </div>
+                      </a>
+                    );
+                  })
                 ) : (
                   <p className="text-center text-gray-500">No links added.</p>
                 )}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BATCH MODAL WITH UNLOCK */}
+      <AnimatePresence>
+        {showBatchModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setShowBatchModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              className="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowBatchModal(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              >
+                <X />
+              </button>
+              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <FolderDown className="text-red-500" /> All Episodes
+              </h3>
+
+              {batchLinks.length > 0 ? (
+                <div className="space-y-3 mb-6">
+                  {batchLinks.map((link, i) => {
+                    const isUnlocked = unlockedLinks[link.url];
+                    return (
+                      <a
+                        key={i}
+                        href={link.url}
+                        onClick={(e) => handleSmartDownload(e, link.url)}
+                        className={`flex items-center justify-between w-full py-4 px-6 rounded-xl transition shadow-lg cursor-pointer ${
+                          isUnlocked
+                            ? "bg-green-600 text-white hover:bg-green-500"
+                            : "bg-white text-black hover:bg-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isUnlocked ? (
+                            <Download size={20} />
+                          ) : (
+                            <ExternalLink size={20} />
+                          )}
+                          {isUnlocked ? "Download" : "Unlock"} {link.quality}{" "}
+                          Pack
+                        </div>
+                        {link.size !== "N/A" && (
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              isUnlocked ? "bg-black/20" : "bg-black text-white"
+                            }`}
+                          >
+                            {link.size}
+                          </span>
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-sm">
+                    No direct batch folders available.
+                  </p>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
